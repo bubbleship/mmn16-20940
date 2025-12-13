@@ -61,7 +61,7 @@ class BcryptHasher(Hasher):
             return False
 
 
-class Argon2IDHasher:
+class Argon2IDHasher(Hasher):
     """Implements Argon2ID hashing with OWASP recommended parameters."""
 
     def __init__(self, pepper: str | None = None):
