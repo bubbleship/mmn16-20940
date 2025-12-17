@@ -4,9 +4,12 @@ import threading
 import uvicorn
 from fastapi import FastAPI
 
-from config.config import ServerConfig
+from config.config import ServerConfig, DefenseConfig, MFADefenseConfig, RateLimitDefenseConfig, \
+    AccountLockoutDefenseConfig, DefensesConfig
+from server import api
 from server.api import router, DefenseMiddleware
 from server.db import InMemoryDB, init_db
+from server.defenses import MFADefence, RateLimitDefence, AccountLockoutDefence
 from server.hasher import set_hasher, PlainTextHasher
 
 
@@ -24,3 +27,12 @@ def start(config: ServerConfig) -> None:
         name="uvicorn",
         daemon=True
     ).start()
+
+
+def set_defenses(defense_config: DefensesConfig) -> None:
+    defenses_map: dict[type[DefenseConfig], type] = {
+        MFADefenseConfig: MFADefence,
+        RateLimitDefenseConfig: RateLimitDefence,
+        AccountLockoutDefenseConfig: AccountLockoutDefence
+    }
+    api.set_defenses([defenses_map[type(config)](**config.as_dict()) for config in defense_config.configs])
