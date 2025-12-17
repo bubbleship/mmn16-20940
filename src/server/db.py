@@ -6,8 +6,8 @@ from server.models import User
 class DB(Protocol):
     """Protocol defining the interface for all database implementations."""
 
-    def new_user(self, user: User) -> None:
-        """Creates a new user in the database."""
+    def save_user(self, user: User) -> None:
+        """Saves a new user in the database."""
         ...
 
     def get_user(self, username) -> User | None:
@@ -19,9 +19,9 @@ class InMemoryDB(DB):
     """Basic in-memory database implementation."""
 
     def __init__(self):
-        self.users = {}
+        self.users: dict[str, User] = {}
 
-    def new_user(self, user: User) -> None:
+    def save_user(self, user: User) -> None:
         self.users[user.username] = user
 
     def get_user(self, username) -> User | None:
