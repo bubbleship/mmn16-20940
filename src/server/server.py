@@ -9,7 +9,7 @@ from config.config import ServerConfig, DefenseConfig, MFADefenseConfig, RateLim
 from server import api
 from server.api import router, DefenseMiddleware
 from server.db import InMemoryDB, init_db
-from server.defenses import MFADefence, RateLimitDefence, AccountLockoutDefence
+from server.defenses import MFADefense, RateLimitDefense, AccountLockoutDefense
 from server.hasher import set_hasher, PlainTextHasher
 
 
@@ -31,8 +31,8 @@ def start(config: ServerConfig) -> None:
 
 def set_defenses(defense_config: DefensesConfig) -> None:
     defenses_map: dict[type[DefenseConfig], type] = {
-        MFADefenseConfig: MFADefence,
-        RateLimitDefenseConfig: RateLimitDefence,
-        AccountLockoutDefenseConfig: AccountLockoutDefence
+        MFADefenseConfig: MFADefense,
+        RateLimitDefenseConfig: RateLimitDefense,
+        AccountLockoutDefenseConfig: AccountLockoutDefense
     }
     api.set_defenses([defenses_map[type(config)](**config.as_dict()) for config in defense_config.configs])

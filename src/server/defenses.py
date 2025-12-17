@@ -17,7 +17,7 @@ class Defense(Protocol):
     async def post_login(self, request: Request, response: Response) -> bool: ...
 
 
-class MFADefence(Defense):
+class MFADefense(Defense):
     """Multi-Factor Authentication (MFA) Defense that checks the user's TOTP code against the secret stored in the database."""
 
     async def pre_login(self, request: Request) -> bool:
@@ -30,7 +30,7 @@ class MFADefence(Defense):
         return True
 
 
-class RateLimitDefence(Defense):
+class RateLimitDefense(Defense):
     """
     Rate Limiting Defense that limits the number of login attempts per IP address.
 
@@ -61,8 +61,8 @@ class RateLimitDefence(Defense):
     def __init__(self, rate: int = 10, capacity: int = 20):
         self.rate: int = rate
         self.capacity: int = capacity
-        bucket_factory = lambda: RateLimitDefence.TokenBucket(rate, capacity)
-        self.buckets: defaultdict[str, RateLimitDefence.TokenBucket] = defaultdict(bucket_factory)
+        bucket_factory = lambda: RateLimitDefense.TokenBucket(rate, capacity)
+        self.buckets: defaultdict[str, RateLimitDefense.TokenBucket] = defaultdict(bucket_factory)
 
     async def pre_login(self, request: Request) -> bool:
         return self.buckets[request.client.host].allow_request()
@@ -71,7 +71,7 @@ class RateLimitDefence(Defense):
         return True
 
 
-class AccountLockoutDefence(Defense):
+class AccountLockoutDefense(Defense):
     """Lockout Defense that prevents brute force attacks by limiting the number of failed login attempts per account."""
 
     class AttemptTracker:
@@ -85,8 +85,8 @@ class AccountLockoutDefence(Defense):
 
     def __init__(self, max_attempts: int = 5):
         self.max_attempts: int = max_attempts
-        attempt_tracker_factory = lambda: AccountLockoutDefence.AttemptTracker(max_attempts)
-        self.attempts: defaultdict[str, AccountLockoutDefence.AttemptTracker] = defaultdict(attempt_tracker_factory)
+        attempt_tracker_factory = lambda: AccountLockoutDefense.AttemptTracker(max_attempts)
+        self.attempts: defaultdict[str, AccountLockoutDefense.AttemptTracker] = defaultdict(attempt_tracker_factory)
 
     async def pre_login(self, request: Request) -> bool:
         now = time.time()
