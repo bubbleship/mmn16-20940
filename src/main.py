@@ -2,15 +2,14 @@ import asyncio
 
 from client.client import Client
 from config.config import ServerConfig, ClientConfig
-from server.server import Server
+from server import server
 
 
 async def main() -> None:
     server_config = ServerConfig('0.0.0.0', 8080)
     client_config = ClientConfig('http://localhost:8080/login')
 
-    server = Server(server_config)
-    server.start()
+    server.start(server_config)
 
     async with Client(client_config) as client:
         coroutine = client.send_login_request(

@@ -9,23 +9,18 @@ from server.api import router, DefenseMiddleware
 from server.db import InMemoryDB, init_db
 from server.hasher import set_hasher, PlainTextHasher
 
-# Startup: Initialize the research environment
-init_db(InMemoryDB())
-set_hasher(PlainTextHasher())
 
+def start(config: ServerConfig) -> None:
+    # Startup: Initialize the research environment
+    init_db(InMemoryDB())
+    set_hasher(PlainTextHasher())
 
-class Server:
-    def __init__(self, config: ServerConfig):
-        self.config = config
+    app = FastAPI()
+    app.include_router(router)  # Include API routes
+    app.add_middleware(DefenseMiddleware)
 
-        self.app = FastAPI()
-        self.app.include_router(router)  # Include API routes
-
-        self.app.add_middleware(DefenseMiddleware)
-
-    def start(self) -> None:
-        threading.Thread(
-            target=lambda: uvicorn.run(self.app, host=self.config.host, port=self.config.port, log_level="info"),
-            name="uvicorn",
-            daemon=True
-        ).start()
+    threading.Thread(
+        target=lambda: uvicorn.run(app, host=config.host, port=config.port, log_level="info"),
+        name="uvicorn",
+        daemon=True
+    ).start()
