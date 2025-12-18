@@ -1,5 +1,7 @@
 # Context manager to ensure user data is ready before the server starts
 import threading
+import csv
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
@@ -8,9 +10,10 @@ from config.config import ServerConfig, DefenseConfig, MFADefenseConfig, RateLim
     AccountLockoutDefenseConfig, DefensesConfig
 from server import api
 from server.api import router, DefenseMiddleware
-from server.db import InMemoryDB, init_db
+from server.db import InMemoryDB, init_db, get_db
 from server.defenses import MFADefense, RateLimitDefense, AccountLockoutDefense
-from server.hasher import set_hasher, PlainTextHasher
+from server.hasher import set_hasher, PlainTextHasher, get_hasher
+from server.models import User
 
 
 def start(config: ServerConfig) -> None:
@@ -27,6 +30,31 @@ def start(config: ServerConfig) -> None:
         name="uvicorn",
         daemon=True
     ).start()
+
+
+def set_users(path: Path) -> None:
+    db = get_db()
+    if db is None:
+        raise RuntimeError("Database not initialized. Please call server.start() before calling load_users().")
+    with open(path, 'r') as f:
+        users = {}
+        reader = csv.DictReader(f)
+        for row in reader:
+            username = row['username']
+            password = row['password']
+            hashed_password = get_hasher().hash_password(password)
+            password_strength_class = row['strength_class']
+            totp_secret = row['totp_secret']
+
+            user = User(
+                username=username,
+                hashed_password=hashed_password,
+                password_strength=password_strength_class,
+                totp_secret=totp_secret,
+                _internal_plain_password=password
+            )
+            users[username] = user
+        db.users = users
 
 
 def set_defenses(defense_config: DefensesConfig) -> None:
