@@ -12,21 +12,19 @@ from server.models import LoginRequest, User
 class Defense(Protocol):
     """Protocol defining the interface for all server-side defense implementations."""
 
-    async def pre_login(self, request: Request) -> bool: ...
+    async def pre_login(self, request: Request, login_request: LoginRequest, user: User) -> bool: ...
 
-    async def post_login(self, request: Request, response: Response) -> bool: ...
+    async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool: ...
 
 
 class MFADefense(Defense):
-    """Multi-Factor Authentication (MFA) Defense that checks the user's TOTP code against the secret stored in the database."""
+    """Multi-Factor Authentication (MFA) Defense that checks the user's TOTP token against the secret stored in the database."""
 
-    async def pre_login(self, request: Request) -> bool:
-        login_request = LoginRequest.model_validate(await request.json())
-        user: User = get_db().get_user(login_request.username)
+    async def pre_login(self, request: Request, login_request: LoginRequest, user: User) -> bool:
         totp = pyotp.TOTP(user.totp_secret)
-        return totp.verify(login_request.totp_code)
+        return totp.verify(login_request.totp_token)
 
-    async def post_login(self, request: Request, response: Response) -> bool:
+    async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
         return True
 
 
@@ -64,10 +62,10 @@ class RateLimitDefense(Defense):
         bucket_factory = lambda: RateLimitDefense.TokenBucket(rate, capacity)
         self.buckets: defaultdict[str, RateLimitDefense.TokenBucket] = defaultdict(bucket_factory)
 
-    async def pre_login(self, request: Request) -> bool:
+    async def pre_login(self, request: Request, login_request: LoginRequest, user: User) -> bool:
         return self.buckets[request.client.host].allow_request()
 
-    async def post_login(self, request: Request, response: Response) -> bool:
+    async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
         return True
 
 
@@ -88,16 +86,12 @@ class AccountLockoutDefense(Defense):
         attempt_tracker_factory = lambda: AccountLockoutDefense.AttemptTracker(max_attempts)
         self.attempts: defaultdict[str, AccountLockoutDefense.AttemptTracker] = defaultdict(attempt_tracker_factory)
 
-    async def pre_login(self, request: Request) -> bool:
+    async def pre_login(self, request: Request, login_request: LoginRequest, user: User) -> bool:
         now = time.time()
-        login_request = LoginRequest.model_validate(await request.json())
-        user: User = get_db().get_user(login_request.username)
-        return user is not None and user.locked_until < now
+        return user.locked_until < now
 
-    async def post_login(self, request: Request, response: Response) -> bool:
+    async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
         now = time.time()
-        login_request = LoginRequest.model_validate(await request.json())
-        user: User = get_db().get_user(login_request.username)
         if response.status_code == 200:
             self.attempts.pop(user.username, None)
             return True
