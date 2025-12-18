@@ -8,10 +8,13 @@ class Client:
         self.config = config
         self.async_client: httpx.AsyncClient | None = None
 
-    async def send_login_request(self, username: str, password: str) -> httpx.Response:
+    async def send_login_request(self, username: str, password: str, totp_token: str | None = None) -> httpx.Response:
+        data = {"username": username, "password": password}
+        if totp_token is not None:
+            data["totp_token"] = totp_token
         return await self.async_client.post(
             url=self.config.target_url,
-            json={"username": username, "password": password},
+            json=data,
             headers={"Content-Type": "application/json"}
         )
 
