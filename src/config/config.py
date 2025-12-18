@@ -1,39 +1,39 @@
 from dataclasses import dataclass, asdict
 
 
-@dataclass
+@dataclass(frozen=True)
 class ServerConfig:
     host: str
     port: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class DefenseConfig:
     def as_dict(self) -> dict:
         return asdict(self)
 
 
-@dataclass
+@dataclass(frozen=True)
 class MFADefenseConfig(DefenseConfig):
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class RateLimitDefenseConfig(DefenseConfig):
     rate: int
     capacity: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class AccountLockoutDefenseConfig(DefenseConfig):
     max_attempts: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class DefensesConfig:
     configs: set[DefenseConfig]
 
 
-@dataclass
+@dataclass(frozen=True)
 class ClientConfig:
     target_url: str
