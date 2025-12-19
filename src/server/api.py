@@ -8,8 +8,7 @@ from server.db import DB, get_db
 from server.defenses import Defense
 from server.hasher import Hasher, get_hasher
 from server.models import LoginRequest
-
-AUTH_FAILED_RESPONSE = Response(status_code=status.HTTP_401_UNAUTHORIZED, content="Invalid credentials")
+from server.responses import USERNAME_NOT_FOUND, INVALID_CREDENTIALS, LOGIN_SUCCESS
 
 _defenses: list[Defense] = []
 
@@ -28,14 +27,14 @@ class DefenseMiddleware(BaseHTTPMiddleware):
             login_request = LoginRequest.model_validate(await request.json())
             user = get_db().get_user(login_request.username)
             if user is None:
-                return AUTH_FAILED_RESPONSE
+                return USERNAME_NOT_FOUND
             for defense in _defenses:
                 if not await defense.pre_login(request, login_request, user):
-                    return AUTH_FAILED_RESPONSE
+                    return defense.response
             response = await call_next(request)
             for defense in _defenses:
                 if not await defense.post_login(request, response, login_request, user):
-                    return AUTH_FAILED_RESPONSE
+                    return defense.response
             return response
         return await call_next(request)
 
@@ -52,15 +51,9 @@ async def login(
     login_request = LoginRequest.model_validate(await request.json())
     username, password = login_request.username, login_request.password
     user = db.get_user(username)
-    if not user:
-        return AUTH_FAILED_RESPONSE
 
     is_password_correct = hasher.verify_password(password, user.hashed_password)
     if not is_password_correct:
-        return AUTH_FAILED_RESPONSE
+        return INVALID_CREDENTIALS
 
-    return {
-        "access_token": f"SUCCESS_TOKEN_FOR_{username}",
-        "token_type": "bearer",
-        "message": "Authentication successful"
-    }
+    return LOGIN_SUCCESS

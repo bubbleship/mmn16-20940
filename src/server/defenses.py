@@ -7,6 +7,7 @@ from fastapi import Request, Response
 
 from server.db import get_db
 from server.models import LoginRequest, User
+from server.responses import INVALID_TOKEN, ACCOUNT_LOCKED, TOO_MANY_REQUESTS
 
 
 class Defense(Protocol):
@@ -15,6 +16,9 @@ class Defense(Protocol):
     async def pre_login(self, request: Request, login_request: LoginRequest, user: User) -> bool: ...
 
     async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool: ...
+
+    @property
+    def response(self) -> Response: ...
 
 
 class MFADefense(Defense):
@@ -26,6 +30,9 @@ class MFADefense(Defense):
 
     async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
         return True
+
+    def response(self) -> Response:
+        return INVALID_TOKEN
 
 
 class RateLimitDefense(Defense):
@@ -68,6 +75,9 @@ class RateLimitDefense(Defense):
     async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
         return True
 
+    def response(self) -> Response:
+        return TOO_MANY_REQUESTS
+
 
 class AccountLockoutDefense(Defense):
     """Lockout Defense that prevents brute force attacks by limiting the number of failed login attempts per account."""
@@ -102,3 +112,6 @@ class AccountLockoutDefense(Defense):
         get_db().save_user(user)  # Update user entry in the database (has no effect when db is in-memory)
         self.attempts.pop(user.username, None)  # Attempt tracker instance is no longer needed
         return False
+
+    def response(self) -> Response:
+        return ACCOUNT_LOCKED
