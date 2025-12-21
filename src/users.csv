@@ -1,0 +1,3 @@
+username,password,strength_class,totp_secret
+admin,admin,low,None
+user_1,london1,low,ZZWLMQ6EGGRI32FQ5TPQ46WUSOMSFNQG

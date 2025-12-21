@@ -31,6 +31,7 @@ class MFADefense(Defense):
     async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
         return True
 
+    @property
     def response(self) -> Response:
         return INVALID_TOKEN
 
@@ -75,6 +76,7 @@ class RateLimitDefense(Defense):
     async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
         return True
 
+    @property
     def response(self) -> Response:
         return TOO_MANY_REQUESTS
 
@@ -113,5 +115,6 @@ class AccountLockoutDefense(Defense):
         self.attempts.pop(user.username, None)  # Attempt tracker instance is no longer needed
         return False
 
+    @property
     def response(self) -> Response:
         return ACCOUNT_LOCKED
