@@ -7,13 +7,15 @@ import uvicorn
 from fastapi import FastAPI
 
 from config.config import ServerConfig, DefenseConfig, MFADefenseConfig, RateLimitDefenseConfig, \
-    AccountLockoutDefenseConfig, DefensesConfig
+    AccountLockoutDefenseConfig, CaptchaDefenseConfig, DefensesConfig
 from server import api
 from server.api import router, DefenseMiddleware
 from server.db import InMemoryDB, init_db, get_db
-from server.defenses import MFADefense, RateLimitDefense, AccountLockoutDefense
+from server.defenses import MFADefense, RateLimitDefense, AccountLockoutDefense , CaptchaDefense
 from server.hasher import set_hasher, PlainTextHasher, get_hasher
 from server.models import User
+
+from src.server.defenses import CaptchaDefense
 
 
 def start(config: ServerConfig) -> None:
@@ -61,6 +63,19 @@ def set_defenses(defense_config: DefensesConfig) -> None:
     defenses_map: dict[type[DefenseConfig], type] = {
         MFADefenseConfig: MFADefense,
         RateLimitDefenseConfig: RateLimitDefense,
-        AccountLockoutDefenseConfig: AccountLockoutDefense
+        AccountLockoutDefenseConfig: AccountLockoutDefense,
+        CaptchaDefenseConfig: CaptchaDefense
     }
     api.set_defenses([defenses_map[type(config)](**config.as_dict()) for config in defense_config.configs])
+
+
+#basically takes the first row from csv "None,None,None,None,123456789" where 123456789 is the current group-seed
+def set_group_seed(path: Path):
+    db = get_db()
+    with open(path, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            group_seed = row['group_seed']
+            if group_seed:
+                print(f"Group Seed: {group_seed}")
+                db.group_seed = group_seed

@@ -1,3 +1,4 @@
-username,password,strength_class,totp_secret
-admin,admin,low,None
-user_1,london1,low,ZZWLMQ6EGGRI32FQ5TPQ46WUSOMSFNQG
+username,password,strength_class,totp_secret,group_seed
+None, None, None, None,123456789
+admin,admin,low,123456789,None
+user_1,london1,low,ZZWLMQ6EGGRI32FQ5TPQ46WUSOMSFNQG,123456789

@@ -1,14 +1,19 @@
 from typing import Awaitable, Callable
 
-from fastapi import APIRouter, Depends, status, Request, Response
+from fastapi import APIRouter, Depends, status, Request, Response , Query
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+
+import hmac
+import hashlib
+import time
+
 
 from server.db import DB, get_db
 from server.defenses import Defense
 from server.hasher import Hasher, get_hasher
 from server.models import LoginRequest
-from server.responses import USERNAME_NOT_FOUND, INVALID_CREDENTIALS, LOGIN_SUCCESS
+from server.responses import USERNAME_NOT_FOUND, INVALID_CREDENTIALS, LOGIN_SUCCESS , INVALID_GROUP_SEED
 
 _defenses: list[Defense] = []
 
@@ -57,3 +62,26 @@ async def login(
         return INVALID_CREDENTIALS
 
     return LOGIN_SUCCESS
+
+
+
+@router.get("/admin/get_captcha_token", status_code=status.HTTP_200_OK)
+async def get_captcha_token(
+    request_group_seed: str = Query(...),
+    db: DB = Depends(get_db)
+):
+    group_seed = db.get_group_seed()
+    if request_group_seed != group_seed:
+        return INVALID_GROUP_SEED
+
+    timestamp = str(int(time.time()))
+    #token = signature.timeStamp -> let us validate the time of creation and also slows the attacker
+    signature = hmac.new(
+        group_seed.encode(),
+        timestamp.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    combined_token = f"{timestamp}.{signature}"
+
+    return {"captcha_token": combined_token}

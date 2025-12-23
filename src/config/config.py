@@ -28,6 +28,11 @@ class RateLimitDefenseConfig(DefenseConfig):
 class AccountLockoutDefenseConfig(DefenseConfig):
     max_attempts: int
 
+@dataclass(frozen=True)
+class CaptchaDefenseConfig(DefenseConfig):
+    max_attempts: int
+
+
 
 @dataclass(frozen=True)
 class DefensesConfig:
@@ -37,3 +42,4 @@ class DefensesConfig:
 @dataclass(frozen=True)
 class ClientConfig:
     target_url: str
+    admin_url: str

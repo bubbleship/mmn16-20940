@@ -14,18 +14,25 @@ class DB(Protocol):
         """Retrieves a user from the database by username if it exists."""
         ...
 
+    def get_group_seed(self) -> int | None:
+        ...
+
 
 class InMemoryDB(DB):
     """Basic in-memory database implementation."""
 
     def __init__(self):
         self.users: dict[str, User] = {}
+        self.group_seed: int = 123456789
 
     def save_user(self, user: User) -> None:
         self.users[user.username] = user
 
     def get_user(self, username) -> User | None:
         return self.users.get(username)
+
+    def get_group_seed(self) -> int | None:
+        return self.group_seed
 
 
 _db: DB | None = None
