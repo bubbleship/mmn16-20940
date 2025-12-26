@@ -1,6 +1,6 @@
 import httpx
 
-from config.config import ClientConfig
+from src.config.config import ClientConfig
 
 
 class Client:

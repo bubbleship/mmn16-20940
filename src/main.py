@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pyotp
 
-from client.client import Client
-from config.config import ServerConfig, ClientConfig, MFADefenseConfig, RateLimitDefenseConfig, \
+from src.client.client import Client
+from src.config.config import ServerConfig, ClientConfig, MFADefenseConfig, RateLimitDefenseConfig, \
     AccountLockoutDefenseConfig, DefensesConfig
-from server import server
+from src.server import server
 
 
 async def start() -> None:

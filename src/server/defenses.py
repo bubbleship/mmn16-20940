@@ -5,9 +5,9 @@ from typing import Protocol
 import pyotp
 from fastapi import Request, Response
 
-from server.db import get_db
-from server.models import LoginRequest, User
-from server.responses import INVALID_TOKEN, ACCOUNT_LOCKED, TOO_MANY_REQUESTS
+from src.server.db import get_db
+from src.server.models import LoginRequest, User
+from src.server.responses import INVALID_TOKEN, ACCOUNT_LOCKED, TOO_MANY_REQUESTS
 
 
 class Defense(Protocol):

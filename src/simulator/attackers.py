@@ -2,7 +2,7 @@ import asyncio
 from enum import StrEnum
 from typing import Protocol, Iterable
 
-from client.client import Client
+from src.client.client import Client
 
 
 class Result(StrEnum):

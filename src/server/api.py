@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, status, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from server.db import DB, get_db
-from server.defenses import Defense
-from server.hasher import Hasher, get_hasher
-from server.models import LoginRequest
-from server.responses import USERNAME_NOT_FOUND, INVALID_CREDENTIALS, LOGIN_SUCCESS
+from src.server.db import DB, get_db
+from src.server.defenses import Defense
+from src.server.hasher import Hasher, get_hasher
+from src.server.models import LoginRequest
+from src.server.responses import USERNAME_NOT_FOUND, INVALID_CREDENTIALS, LOGIN_SUCCESS
 
 _defenses: list[Defense] = []
 
