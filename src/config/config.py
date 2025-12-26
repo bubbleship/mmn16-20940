@@ -37,3 +37,13 @@ class DefensesConfig:
 @dataclass(frozen=True)
 class ClientConfig:
     target_url: str
+
+
+@dataclass(frozen=True)
+class PasswordConfig:
+    weak_alphabet: str
+    weak_length: int
+    medium_alphabet: str
+    medium_length: int
+    strong_alphabet: str
+    strong_length: int
