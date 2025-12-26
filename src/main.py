@@ -1,6 +1,7 @@
 import asyncio
-import pyotp
 from pathlib import Path
+
+import pyotp
 
 from client.client import Client
 from config.config import ServerConfig, ClientConfig, MFADefenseConfig, RateLimitDefenseConfig, \
@@ -8,7 +9,7 @@ from config.config import ServerConfig, ClientConfig, MFADefenseConfig, RateLimi
 from server import server
 
 
-async def main() -> None:
+async def start() -> None:
     server_config = ServerConfig('0.0.0.0', 8080)
     client_config = ClientConfig('http://localhost:8080/login')
 
@@ -45,5 +46,9 @@ async def main() -> None:
                 print(f"Could not parse JSON response: {response.text}")
 
 
+def main() -> None:
+    asyncio.run(start())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
