@@ -4,7 +4,7 @@ import string
 
 import pyotp
 
-from config.config import PasswordConfig
+from src.config.config import PasswordConfig
 
 
 def generate_password(strength, config: PasswordConfig):
