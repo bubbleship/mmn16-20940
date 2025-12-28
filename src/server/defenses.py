@@ -1,16 +1,16 @@
+import hashlib
+import hmac
 import time
 from collections import defaultdict
 from typing import Protocol
 
-import hmac
-import hashlib
-
 import pyotp
 from fastapi import Request, Response
 
+from config.config import GROUP_SEED
 from server.db import get_db
 from server.models import LoginRequest, User
-from server.responses import INVALID_TOKEN, ACCOUNT_LOCKED, TOO_MANY_REQUESTS , CAPTCHA_REQUIRED
+from server.responses import INVALID_TOKEN, ACCOUNT_LOCKED, TOO_MANY_REQUESTS, CAPTCHA_REQUIRED
 
 
 class Defense(Protocol):
@@ -18,10 +18,12 @@ class Defense(Protocol):
 
     async def pre_login(self, request: Request, login_request: LoginRequest, user: User) -> bool: ...
 
-    async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool: ...
+    async def post_login(self, request: Request, response: Response, login_request: LoginRequest,
+                         user: User) -> bool: ...
 
     @property
     def response(self) -> Response: ...
+
 
 class AttemptTracker:
     def __init__(self, max_attempts: int):
@@ -95,6 +97,7 @@ class RateLimitDefense(Defense):
 
 class AccountLockoutDefense(Defense):
     """Lockout Defense that prevents brute force attacks by limiting the number of failed login attempts per account."""
+
     def __init__(self, max_attempts: int = 5):
         self.max_attempts: int = max_attempts
         attempt_tracker_factory = lambda: AttemptTracker(max_attempts)
@@ -122,9 +125,8 @@ class AccountLockoutDefense(Defense):
         return ACCOUNT_LOCKED
 
 
-
 class CaptchaDefense(Defense):
-    "Captcha Defense that slows the attacker by making it get a CAPTCHA token from the group_seed stored in the database"
+    """Simulates a CAPTCHA challenge by requiring users to provide a valid captcha token in the login request."""
 
     def __init__(self, max_attempts: int = 5):
         self.max_attempts: int = max_attempts
@@ -132,47 +134,27 @@ class CaptchaDefense(Defense):
         self.attempts: defaultdict[str, AttemptTracker] = defaultdict(attempt_tracker_factory)
 
     async def pre_login(self, request: Request, login_request: LoginRequest, user: User) -> bool:
-        if not user.captcha_required:
+        if self.attempts[user.username].make_attempt():
             return True
 
-        token = login_request.captcha_token
+        captcha_token = login_request.captcha_token
 
-        #toekn format = "timeStamp.signature"
-        if not token or "." not in token:
+        if not captcha_token:
             return False
 
-        try:
-            token_timestamp, provided_signature = token.split(".")
+        token = hmac.new(  # It doesn't matter what the token is, in the experiment
+            str(GROUP_SEED).encode(),
+            None,
+            hashlib.sha256
+        ).hexdigest()
 
-            group_seed = get_db().get_group_seed()
-            expected_sig = hmac.new(
-                group_seed.encode(),
-                token_timestamp.encode(),
-                hashlib.sha256
-            ).hexdigest()
-
-            if hmac.compare_digest(provided_signature, expected_sig):
-                if int(time.time()) - int(token_timestamp) < 300:
-                    return True
-
-            return False
-        except Exception:
-            return False
-
+        return hmac.compare_digest(token, captcha_token)
 
     async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
         if response.status_code == 200:
             self.attempts.pop(user.username, None)
-            user.captcha_required = False
-            get_db().save_user(user)
-            return True
-        # Login attempt unsuccessful
-        if self.attempts[user.username].make_attempt():
-            return True  # An attempt within range
-        user.captcha_required = True  # Too many failed attempts
-        get_db().save_user(user)  # Update user entry in the database (has no effect when db is in-memory)
-        self.attempts.pop(user.username, None)  # Attempt tracker instance is no longer needed
-        return True #next try will require captcha in pre-login
+        # CAPTCHA response handled in pre_login
+        return True  # In case of an unsuccessful login attempt, return the relevant response
 
     @property
     def response(self) -> Response:

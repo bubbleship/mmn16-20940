@@ -15,8 +15,6 @@ from server.defenses import MFADefense, RateLimitDefense, AccountLockoutDefense 
 from server.hasher import set_hasher, PlainTextHasher, get_hasher
 from server.models import User
 
-from src.server.defenses import CaptchaDefense
-
 
 def start(config: ServerConfig) -> None:
     # Startup: Initialize the research environment
@@ -37,7 +35,7 @@ def start(config: ServerConfig) -> None:
 def set_users(path: Path) -> None:
     db = get_db()
     if db is None:
-        raise RuntimeError("Database not initialized. Please call server.start() before calling load_users().")
+        raise RuntimeError("Database not initialized. Please call server.start() before calling set_users().")
     with open(path, 'r') as f:
         users = {}
         reader = csv.DictReader(f)
@@ -67,15 +65,3 @@ def set_defenses(defense_config: DefensesConfig) -> None:
         CaptchaDefenseConfig: CaptchaDefense
     }
     api.set_defenses([defenses_map[type(config)](**config.as_dict()) for config in defense_config.configs])
-
-
-#basically takes the first row from csv "None,None,None,None,123456789" where 123456789 is the current group-seed
-def set_group_seed(path: Path):
-    db = get_db()
-    with open(path, 'r') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            group_seed = row['group_seed']
-            if group_seed:
-                print(f"Group Seed: {group_seed}")
-                db.group_seed = group_seed

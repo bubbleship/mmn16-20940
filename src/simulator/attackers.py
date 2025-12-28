@@ -12,6 +12,7 @@ class Result(StrEnum):
     MFA = "MFA"
     RATE_LIMIT = "RATE LIMIT"
     ACCOUNT_LOCKOUT = "ACCOUNT LOCKOUT"
+    CAPTCHA = "CAPTCHA"
     INTERNAL_SERVER_ERROR = "INTERNAL SERVER ERROR"
 
 
@@ -46,10 +47,14 @@ class Attacker(Protocol):
                 return Result.INVALID_CREDENTIALS
             case 404:
                 return Result.USERNAME_NOT_FOUND
+            case 403:
+                return Result.MFA
             case 429:
                 return Result.RATE_LIMIT
             case 423:
                 return Result.ACCOUNT_LOCKOUT
+            case 418:
+                return Result.CAPTCHA
             case _:
                 return Result.INTERNAL_SERVER_ERROR
 
