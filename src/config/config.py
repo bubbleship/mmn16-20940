@@ -1,4 +1,6 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
+
+GROUP_SEED: int = 511584106
 
 
 @dataclass(frozen=True)
@@ -28,10 +30,10 @@ class RateLimitDefenseConfig(DefenseConfig):
 class AccountLockoutDefenseConfig(DefenseConfig):
     max_attempts: int
 
+
 @dataclass(frozen=True)
 class CaptchaDefenseConfig(DefenseConfig):
     max_attempts: int
-
 
 
 @dataclass(frozen=True)
@@ -43,3 +45,4 @@ class DefensesConfig:
 class ClientConfig:
     target_url: str
     admin_url: str
+    group_seed: int = field(default=GROUP_SEED, init=False)
