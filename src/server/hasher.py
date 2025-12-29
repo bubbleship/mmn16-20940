@@ -4,9 +4,15 @@ import bcrypt
 from argon2 import PasswordHasher, Type as Argon2Type
 from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
+from config.config import HasherConfig
+
 
 class Hasher(Protocol):
     """Protocol defining the interface for all hashing implementations."""
+
+    def __init__(self, config: HasherConfig):
+        """Initializes a hasher instance with the given configuration."""
+        self.pepper = config.pepper
 
     def hash_password(self, password: str) -> str:
         """Generates a cryptographic hash of the password."""
@@ -29,12 +35,12 @@ class PlainTextHasher(Hasher):
         return password == hashed_password
 
 
-class BcryptHasher(Hasher):
+class BCryptHasher(Hasher):
     """Implements bcrypt legacy hashing with an OWASP recommended cost factor."""
 
-    def __init__(self, pepper: str | None = None):
+    def __init__(self, config: HasherConfig):
         """Initializes pepper and bcrypt hasher with recommended parameters."""
-        self.pepper = pepper
+        super().__init__(config)
         self.work_factor = 12  # 12 >= 10 per OWASP recommendation
 
     def hash_password(self, password: str) -> str:
@@ -64,9 +70,9 @@ class BcryptHasher(Hasher):
 class Argon2IDHasher(Hasher):
     """Implements Argon2ID hashing with OWASP recommended parameters."""
 
-    def __init__(self, pepper: str | None = None):
+    def __init__(self, config: HasherConfig):
         """Initializes pepper and Argon2ID hasher with recommended parameters."""
-        self.pepper = pepper
+        super().__init__(config)
         self.ph = PasswordHasher(
             time_cost=2,
             memory_cost=19 * 1024,
@@ -88,7 +94,7 @@ class Argon2IDHasher(Hasher):
 
         try:
             return self.ph.verify(hashed_password, password)
-        except VerifyMismatchError | VerificationError | InvalidHashError:
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
             return False
 
 

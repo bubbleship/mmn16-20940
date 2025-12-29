@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict, field
+from enum import StrEnum
 
 GROUP_SEED: int = 511584106
 
@@ -7,6 +8,18 @@ GROUP_SEED: int = 511584106
 class ServerConfig:
     host: str
     port: int
+
+
+class HasherType(StrEnum):
+    PlainText = "PlainText"
+    BCrypt = "BCrypt"
+    Argon2ID = "Argon2ID"
+
+
+@dataclass(frozen=True)
+class HasherConfig:
+    hasher_type: HasherType
+    pepper: str | None = field(default=None)
 
 
 @dataclass(frozen=True)
