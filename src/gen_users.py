@@ -1,62 +1,62 @@
 import csv
-import random
 import secrets
+import string
 
 import pyotp
 
-# Research-based categories for the dictionary
-dictionary_data = {
-    "sports": ["football", "soccer", "chelsea", "liverpool", "basketball", "baseball", "jordan"],
-    "nature_positivity": ["sunshine", "freedom", "summer", "winter", "spring", "dragon", "monkey"],
-    "common_names": ["michael", "daniel", "jessica", "charlie", "ashley", "michelle"],
-    "cities_places": ["rome", "lima", "austin", "london", "tokyo", "york", "antonio"],
-    "food_drink": ["chocolate", "coffee", "pizza", "cookie", "honey", "whiskey", "ice"],
-    "culture_fiction": ["superman", "pokemon", "starwars", "naruto", "matrix", "batman"],
-    "system_defaults": ["admin", "password", "secret", "welcome", "guest", "root"]
-}
-all_words = [word for cat in dictionary_data.values() for word in cat]
+from src.config.config import PasswordConfig
 
 
-def save_words():
-    # Flatten and create words.txt
-    with open("words.txt", "w") as f:
-        f.write("\n".join(all_words))
-
-
-def generate_password(word, strength):
+def generate_password(strength, config: PasswordConfig):
     if strength == "weak":
-        # Pattern: Word + single digit or simple sequence
-        return f"{word}{random.choice(['1', '123', '2024', '2025'])}"
+        alphabet = config.weak_alphabet
+        length = config.weak_length
     elif strength == "medium":
-        # Pattern: Capitalized + 2 digits + symbol (the "Corporate Standard")
-        return f"{word.capitalize()}{random.randint(10, 99)}!"
+        alphabet = config.medium_alphabet
+        length = config.medium_length
     else:  # strong
-        # Pattern: High entropy random string (simulating Password Manager use)
-        return secrets.token_urlsafe(12)
+        alphabet = config.strong_alphabet
+        length = config.strong_length
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
-def main():
-    save_words()
-    # Generate 50 mock users
+def generate_users(count: int, config: PasswordConfig) -> list[dict]:
     users = []
     levels = ["weak", "medium", "strong"]
 
-    for i in range(1, 51):
+    for i in range(1, count + 1):
         strength = levels[(i - 1) % 3]
-        word = random.choice(all_words)
         users.append({
             "username": f"user_{i}",
-            "password": generate_password(word, strength),
+            "password": generate_password(strength, config),
             "totp_secret": pyotp.random_base32(),
             "strength_class": strength
         })
 
+    return users
+
+
+def save_users(users: list[dict]):
     with open("users.csv", "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["username", "password", "totp_secret", "strength_class"])
         writer.writeheader()
         writer.writerows(users)
 
-    print(f"Generated 'words.txt' with {len(all_words)} words and 'users.csv' with 50 users.")
+
+def main():
+    # Generate 50 mock users
+    config = PasswordConfig(
+        weak_alphabet=string.ascii_lowercase,
+        weak_length=6,
+        medium_alphabet=string.ascii_lowercase + string.digits,
+        medium_length=8,
+        strong_alphabet=string.ascii_letters + string.digits + string.punctuation,
+        strong_length=12
+    )
+
+    users = generate_users(50, config)
+    save_users(users)
+    print(f"Generated 'users.csv' with 50 users.")
 
 
 if __name__ == "__main__":

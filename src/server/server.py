@@ -6,14 +6,14 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI
 
-from config.config import ServerConfig, DefenseConfig, MFADefenseConfig, RateLimitDefenseConfig, \
+from src.config.config import ServerConfig, DefenseConfig, MFADefenseConfig, RateLimitDefenseConfig, \
     AccountLockoutDefenseConfig, CaptchaDefenseConfig, DefensesConfig
-from server import api
-from server.api import router, DefenseMiddleware
-from server.db import InMemoryDB, init_db, get_db
-from server.defenses import MFADefense, RateLimitDefense, AccountLockoutDefense , CaptchaDefense
-from server.hasher import set_hasher, PlainTextHasher, get_hasher
-from server.models import User
+from src.server import api
+from src.server.api import router, DefenseMiddleware
+from src.server.db import InMemoryDB, init_db, get_db
+from src.server.defenses import MFADefense, RateLimitDefense, AccountLockoutDefense, CaptchaDefense
+from src.server.hasher import set_hasher, PlainTextHasher, get_hasher
+from src.server.models import User
 
 
 def start(config: ServerConfig) -> None:

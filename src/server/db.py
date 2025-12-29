@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from server.models import User
+from src.server.models import User
 
 
 class DB(Protocol):

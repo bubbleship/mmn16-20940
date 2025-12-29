@@ -7,10 +7,10 @@ from typing import Protocol
 import pyotp
 from fastapi import Request, Response
 
-from config.config import GROUP_SEED
-from server.db import get_db
-from server.models import LoginRequest, User
-from server.responses import INVALID_TOKEN, ACCOUNT_LOCKED, TOO_MANY_REQUESTS, CAPTCHA_REQUIRED
+from src.config.config import GROUP_SEED
+from src.server.db import get_db
+from src.server.models import LoginRequest, User
+from src.server.responses import INVALID_TOKEN, ACCOUNT_LOCKED, TOO_MANY_REQUESTS, CAPTCHA_REQUIRED
 
 
 class Defense(Protocol):

@@ -46,3 +46,13 @@ class ClientConfig:
     target_url: str
     admin_url: str
     group_seed: int = field(default=GROUP_SEED, init=False)
+
+
+@dataclass(frozen=True)
+class PasswordConfig:
+    weak_alphabet: str
+    weak_length: int
+    medium_alphabet: str
+    medium_length: int
+    strong_alphabet: str
+    strong_length: int
