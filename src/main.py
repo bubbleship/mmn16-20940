@@ -3,6 +3,7 @@ import string
 
 import pyotp
 
+from src.simulator.experiment import run_experiment
 from src.client.client import Client
 from src.config.config import ServerConfig, ClientConfig, MFADefenseConfig, RateLimitDefenseConfig, \
     AccountLockoutDefenseConfig, PasswordConfig
@@ -64,7 +65,7 @@ async def start() -> None:
 
 
 def main() -> None:
-    asyncio.run(start())
+    asyncio.run(run_experiment())
 
 
 if __name__ == "__main__":

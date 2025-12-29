@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from enum import StrEnum
 from typing import Protocol, Iterable
 
@@ -21,20 +22,6 @@ class Attacker(Protocol):
 
     def __init__(self, client: Client):
         self.client: Client = client
-
-    async def launch_attack(self, targets: Iterable[str], patterns: Iterable[str], delay: float = 0.0) -> None:
-        """
-        Simulates a dictionary-based attack on the given targets.
-
-        Args:
-            targets: username to target in the attack
-            patterns: an iterable of passwords to try against the targets
-            delay: the delay between each password attempt, in seconds. Defaults to None.
-
-        Returns:
-            The result of the attack.
-        """
-        ...
 
     async def attempt_login(self, username: str, password: str) -> Result:
         """Attempts to log in with the given username and password and interprets the result."""
@@ -62,28 +49,55 @@ class Attacker(Protocol):
 class BruteForceAttacker(Attacker):
     """Represents a brute force attacker that tries the given dictionary of passwords against a small set of targets."""
 
-    async def launch_attack(self, targets: Iterable[str], patterns: Iterable[str], delay: float = 0.0) -> None:
-        for target in targets:
-            for pattern in patterns:
-                result = await self.attempt_login(target, pattern)
-                await asyncio.sleep(delay)
-                if result is Result.INVALID_CREDENTIALS:
-                    continue
-                else:  # LOGIN_SUCCESS, USERNAME_NOT_FOUND, any defenses
-                    break
-        raise ValueError('Empty targets or patterns not allowed.')
+    async def launch_attack(self, target: str, patterns: Iterable[str], delay: float = 0.0) -> dict:
+        """
+        Simulates a brute force attack on the given targets.
+
+        Args:
+            target: username to target in the attack
+            patterns: an iterable of passwords to try against the targets
+            delay: the delay between each password attempt, in seconds. Defaults to None.
+
+        Returns:
+            A summary of the attack.
+        """
+        summary = {target: defaultdict(int)}
+        for pattern in patterns:
+            result = await self.attempt_login(target, pattern)
+            await asyncio.sleep(delay)
+            if result is Result.INVALID_CREDENTIALS:
+                summary[target][result] += 1
+                continue
+            else:  # LOGIN_SUCCESS, USERNAME_NOT_FOUND, any defenses
+                summary[target][result] += 1
+                break
+        return summary
 
 
 class PasswordSprayAttacker(Attacker):
     """Represents a password spray attacker that tries the given dictionary of passwords against a large set of targets."""
 
-    async def launch_attack(self, targets: Iterable[str], patterns: Iterable[str], delay: float = 0.0) -> None:
+    async def launch_attack(self, targets: Iterable[str], patterns: Iterable[str], delay: float = 0.0) -> dict:
+        """
+        Simulates a dictionary-based attack on the given targets.
+
+        Args:
+            targets: usernames to target in the attack
+            patterns: an iterable of passwords to try against the targets
+            delay: the delay between each password attempt, in seconds. Defaults to None.
+
+        Returns:
+            A summary of the attack.
+        """
+        summary = {target: defaultdict(int) for target in targets}
         for pattern in patterns:
             for target in targets:
                 result = await self.attempt_login(target, pattern)
                 await asyncio.sleep(delay)
                 if result is Result.INVALID_CREDENTIALS:
+                    summary[target][result] += 1
                     continue
                 else:  # LOGIN_SUCCESS, USERNAME_NOT_FOUND, any defenses
+                    summary[target][result] += 1
                     break
-        raise ValueError('Empty targets or patterns not allowed.')
+        return summary
