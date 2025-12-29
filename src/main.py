@@ -3,7 +3,7 @@ import string
 
 import pyotp
 
-from gen_users import generate_users, save_users
+from src.gen_users import generate_users, save_users
 from src.client.client import Client
 from src.config.config import ServerConfig, ClientConfig, MFADefenseConfig, RateLimitDefenseConfig, \
     AccountLockoutDefenseConfig, DefensesConfig, PasswordConfig
