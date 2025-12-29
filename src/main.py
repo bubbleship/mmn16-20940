@@ -1,11 +1,12 @@
 import asyncio
-from pathlib import Path
+import string
 
 import pyotp
 
+from gen_users import generate_users, save_users
 from src.client.client import Client
 from src.config.config import ServerConfig, ClientConfig, MFADefenseConfig, RateLimitDefenseConfig, \
-    AccountLockoutDefenseConfig, DefensesConfig
+    AccountLockoutDefenseConfig, DefensesConfig, PasswordConfig
 from src.server import server
 
 
@@ -19,8 +20,24 @@ async def start() -> None:
     defense_config = DefensesConfig(
         {MFADefenseConfig(), RateLimitDefenseConfig(10, 20), AccountLockoutDefenseConfig(20)})
 
+    password_config = PasswordConfig(
+        weak_alphabet=string.ascii_lowercase,
+        weak_length=6,
+        medium_alphabet=string.ascii_lowercase + string.digits,
+        medium_length=8,
+        strong_alphabet=string.ascii_letters + string.digits + string.punctuation,
+        strong_length=12
+    )
+
+    users = generate_users(30, password_config)
+    save_users(users)
+    print(
+        f"Generated {len(users)} mock users. Passwords are generated using the following configuration: "
+        f"{password_config}"
+    )
+
     server.start(server_config)
-    server.set_users(Path('users.csv'))
+    server.set_users(users)
     server.set_defenses(defense_config)
 
     # Give the server some time to start up
