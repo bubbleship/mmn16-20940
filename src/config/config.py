@@ -37,11 +37,6 @@ class CaptchaDefenseConfig(DefenseConfig):
 
 
 @dataclass(frozen=True)
-class DefensesConfig:
-    configs: set[DefenseConfig]
-
-
-@dataclass(frozen=True)
 class ClientConfig:
     target_url: str
     admin_url: str

@@ -3,10 +3,10 @@ import string
 
 import pyotp
 
-from src.gen_users import generate_users, save_users
 from src.client.client import Client
 from src.config.config import ServerConfig, ClientConfig, MFADefenseConfig, RateLimitDefenseConfig, \
-    AccountLockoutDefenseConfig, DefensesConfig, PasswordConfig
+    AccountLockoutDefenseConfig, PasswordConfig
+from src.gen_users import generate_users, save_users
 from src.server import server
 
 
@@ -16,9 +16,6 @@ async def start() -> None:
         target_url='http://localhost:8080/login',
         admin_url='http://localhost:8080/admin'
     )
-
-    defense_config = DefensesConfig(
-        {MFADefenseConfig(), RateLimitDefenseConfig(10, 20), AccountLockoutDefenseConfig(20)})
 
     password_config = PasswordConfig(
         weak_alphabet=string.ascii_lowercase,
@@ -38,7 +35,7 @@ async def start() -> None:
 
     server.start(server_config)
     server.set_users(users)
-    server.set_defenses(defense_config)
+    server.set_defenses(MFADefenseConfig(), RateLimitDefenseConfig(10, 20), AccountLockoutDefenseConfig(20))
 
     # Give the server some time to start up
     await asyncio.sleep(1)

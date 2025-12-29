@@ -4,7 +4,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from src.config.config import ServerConfig, DefenseConfig, MFADefenseConfig, RateLimitDefenseConfig, \
-    AccountLockoutDefenseConfig, CaptchaDefenseConfig, DefensesConfig
+    AccountLockoutDefenseConfig, CaptchaDefenseConfig
 from src.server import api
 from src.server.api import router, DefenseMiddleware
 from src.server.db import InMemoryDB, init_db, get_db
@@ -52,11 +52,11 @@ def set_users(user_list: list[dict]) -> None:
     db.users = users
 
 
-def set_defenses(defense_config: DefensesConfig) -> None:
+def set_defenses(*args: DefenseConfig) -> None:
     defenses_map: dict[type[DefenseConfig], type] = {
         MFADefenseConfig: MFADefense,
         RateLimitDefenseConfig: RateLimitDefense,
         AccountLockoutDefenseConfig: AccountLockoutDefense,
         CaptchaDefenseConfig: CaptchaDefense
     }
-    api.set_defenses([defenses_map[type(config)](**config.as_dict()) for config in defense_config.configs])
+    api.set_defenses([defenses_map[type(config)](**config.as_dict()) for config in args])
