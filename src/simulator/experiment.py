@@ -259,6 +259,33 @@ class ExperimentRunner:
             **attack_results
         }
 
+    async def lockout_with_captcha_case(self, target: str) -> Dict[str, Any]:
+        """
+        Literature-Based Combo: Account Lockout protected by CAPTCHA.
+        As noted in the review, CAPTCHA prevents automated DoS attacks
+        aimed at locking out legitimate users.
+        """
+        # Setting the secure baseline
+        hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        server.set_hasher(hasher_config)
+
+        # 1. Captcha starts after 3 failed attempts to stop bots.
+        # 2. Lockout happens at 5 attempts (as per literature) as a final fail-safe.
+        server.set_defenses(
+            CaptchaDefenseConfig(max_attempts=3),
+            AccountLockoutDefenseConfig(max_attempts=5)
+        )
+
+        # Running attacks - this will demonstrate how CAPTCHA blocks the bot
+        # before it can trigger a full account lockout.
+        attack_results = await self._run_attacks(target, include_password_spray=True)
+
+        return {
+            'case': 'lockout_with_captcha',
+            'hasher': hasher_config.hasher_type.value,
+            'defenses': ['CAPTCHA', 'Account Lockout'],
+            **attack_results
+        }
 
     async def combined_defenses_case(self, target: str) -> Dict[str, Any]:
         """Run a case with multiple defenses combined."""
@@ -304,7 +331,8 @@ class ExperimentRunner:
                 ('plaintext_hasher', self.plaintext_hasher_case),
                 ('combined_defenses', self.combined_defenses_case),
                 ('argon2id+pepper_hashing' , self.argon2id_pepper_hashing_case),
-                ('mfa_with_rate_limiting',self.mfa_with_rate_limiting_case)
+                ('mfa_with_rate_limiting',self.mfa_with_rate_limiting_case),
+                ('lockout_with_captcha_case',self.lockout_with_captcha_case)
             ]
             
             for case_name, case_func in cases:
