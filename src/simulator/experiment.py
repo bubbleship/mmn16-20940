@@ -71,7 +71,7 @@ class ExperimentRunner:
         self.brute_force_attacker = BruteForceAttacker(client)
         self.password_spray_attacker = PasswordSprayAttacker(client)
 
-
+    
         
     def _get_brute_force_generator(self, max_attempts: int = 1_000):
         """Get brute force password generator for weak passwords."""
@@ -126,7 +126,7 @@ class ExperimentRunner:
             'defenses': [],
             **attack_results
         }
-
+    
     async def argon2id_pepper_hashing_case(self, target: str) -> Dict[str, Any]:
         """Argon2id hashing with a server-side Pepper."""
         hasher_config = HasherConfig(
@@ -152,7 +152,7 @@ class ExperimentRunner:
         server.set_hasher(hasher_config)
         server.set_defenses(MFADefenseConfig())
         
-        attack_results = await self._run_attacks(target, include_password_spray=False)
+        attack_results = await self._run_attacks(target, include_password_spray=True)
         
         return {
             'case': 'mfa',
