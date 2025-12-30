@@ -287,6 +287,47 @@ class ExperimentRunner:
             **attack_results
         }
 
+    async def lockout_with_captcha_case(self, target: str) -> Dict[str, Any]:
+        """Defense combo: CAPTCHA protects against lockout-based DoS."""
+        hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        server.set_hasher(hasher_config)
+
+        # CAPTCHA at 3 attempts, Lockout at 5
+        server.set_defenses(
+            CaptchaDefenseConfig(max_attempts=3),
+            AccountLockoutDefenseConfig(max_attempts=5)
+        )
+
+        attack_results = await self._run_attacks(target, include_password_spray=True)
+
+        return {
+            'case': 'lockout_with_captcha',
+            'hasher': 'Argon2id',
+            'defenses': ['CAPTCHA', 'Account Lockout'],
+            **attack_results
+        }
+
+    async def total_protection_case(self, target: str) -> Dict[str, Any]:
+        """Maximum security: All defenses enabled simultaneously."""
+        hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        server.set_hasher(hasher_config)
+
+        server.set_defenses(
+            RateLimitDefenseConfig(rate=5, capacity=10),
+            CaptchaDefenseConfig(max_attempts=3),
+            AccountLockoutDefenseConfig(max_attempts=5),
+            MFADefenseConfig()
+        )
+
+        attack_results = await self._run_attacks(target, include_password_spray=True)
+
+        return {
+            'case': 'total_protection',
+            'hasher': 'Argon2id',
+            'defenses': ['RateLimit', 'CAPTCHA', 'Account Lockout', 'MFA'],
+            **attack_results
+        }
+
     async def combined_defenses_case(self, target: str) -> Dict[str, Any]:
         """Run a case with multiple defenses combined."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
