@@ -3,7 +3,7 @@ import string
 import random
 import secrets
 from typing import Dict, Any
-
+import asyncio
 from src.simulator.attackers import BruteForceAttacker, PasswordSprayAttacker
 from simulator.pattern_sim import brute_force
 from src.client.client import Client
@@ -84,11 +84,22 @@ class ExperimentRunner:
     async def _run_attacks(self, target: str, include_password_spray: bool = True) -> Dict[str, Any]:
         """Execute both brute force and password spray attacks, measuring execution time."""
         results = {}
+
+        TIMEOUT_SECONDS = 30
         
         # Run brute force attack
         brute_force_gen = self._get_brute_force_generator()
         t0 = time.time()
-        brute_force_summary = await self.brute_force_attacker.launch_attack(target, brute_force_gen)
+        try:
+            brute_force_summary = await asyncio.wait_for(
+                self.brute_force_attacker.launch_attack(target, brute_force_gen),
+                timeout=TIMEOUT_SECONDS
+            )
+        except asyncio.TimeoutError:
+            brute_force_summary = {'status': 'timeout', 'message': 'Attack stopped early (Bcrypt/Timeout)'}
+
+       # brute_force_summary = await self.brute_force_attacker.launch_attack(target, brute_force_gen)
+
         brute_force_time = time.time() - t0
         
         results.update({
@@ -99,10 +110,17 @@ class ExperimentRunner:
         # Run password spray attack if requested
         if include_password_spray:
             t0 = time.time()
-            password_spray_summary = await self.password_spray_attacker.launch_attack(
-                self.password_spray_targets, 
-                self.password_spray_collection
-            )
+            try:
+                password_spray_summary = await asyncio.wait_for(
+                    self.password_spray_attacker.launch_attack(
+                        self.password_spray_targets,
+                        self.password_spray_collection
+                    ),
+                    timeout=TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                password_spray_summary = {'status': 'timeout', 'message': 'Spray stopped early (Bcrypt/Timeout)'}
+
             password_spray_time = time.time() - t0
             
             results.update({
