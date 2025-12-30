@@ -266,7 +266,7 @@ class ExperimentRunner:
         server.set_hasher(hasher_config)
         server.set_defenses(
             RateLimitDefenseConfig(rate=5, capacity=10),
-            AccountLockoutDefenseConfig(max_attempts=3)
+            AccountLockoutDefenseConfig(max_attempts=5)
         )
         
         attack_results = await self._run_attacks(target, include_password_spray=True)
