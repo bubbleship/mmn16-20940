@@ -160,6 +160,29 @@ class ExperimentRunner:
             'defenses': ['MFA'],
             **attack_results
         }
+
+    async def mfa_with_rate_limiting_case(self, target: str) -> Dict[str, Any]:
+        """
+        Literature Case: MFA combined with Rate Limiting.
+        Prevents MFA exhaustion attacks and brute-forcing of the TOTP token.
+        """
+        hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        server.set_hasher(hasher_config)
+
+        # Implementing both defenses as recommended in the literature review
+        server.set_defenses(
+            RateLimitDefenseConfig(rate=5, capacity=10),
+            MFADefenseConfig()
+        )
+
+        attack_results = await self._run_attacks(target, include_password_spray=True)
+
+        return {
+            'case': 'mfa_plus_ratelimit',
+            'hasher': 'Argon2id',
+            'defenses': ['MFA', 'RateLimit'],
+            **attack_results
+        }
         
     async def rate_limit_case(self, target: str) -> Dict[str, Any]:
         """Run rate limiting defense case."""
@@ -235,7 +258,8 @@ class ExperimentRunner:
             'defenses': [],
             **attack_results
         }
-        
+
+
     async def combined_defenses_case(self, target: str) -> Dict[str, Any]:
         """Run a case with multiple defenses combined."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
@@ -279,7 +303,8 @@ class ExperimentRunner:
                 ('bcrypt_hasher', self.bcrypt_hasher_case),
                 ('plaintext_hasher', self.plaintext_hasher_case),
                 ('combined_defenses', self.combined_defenses_case),
-                ('argon2id+pepper_hashing' , self.argon2id_pepper_hashing_case)
+                ('argon2id+pepper_hashing' , self.argon2id_pepper_hashing_case),
+                ('mfa_with_rate_limiting',self.mfa_with_rate_limiting_case)
             ]
             
             for case_name, case_func in cases:
