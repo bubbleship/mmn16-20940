@@ -70,6 +70,8 @@ class ExperimentRunner:
         """Initialize attacker instances with the client."""
         self.brute_force_attacker = BruteForceAttacker(client)
         self.password_spray_attacker = PasswordSprayAttacker(client)
+
+
         
     def _get_brute_force_generator(self, max_attempts: int = 1_000):
         """Get brute force password generator for weak passwords."""
@@ -122,6 +124,25 @@ class ExperimentRunner:
             'case': 'control',
             'hasher': hasher_config.hasher_type.value,
             'defenses': [],
+            **attack_results
+        }
+
+    async def argon2id_pepper_hashing_case(self, target: str) -> Dict[str, Any]:
+        """Argon2id hashing with a server-side Pepper."""
+        hasher_config = HasherConfig(
+            hasher_type=HasherType.Argon2ID,
+            pepper="3f7a1b8e9d2c4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9"
+        )
+
+        server.set_hasher(hasher_config)
+        server.set_defenses()
+
+        attack_results = await self._run_attacks(target, include_password_spray=True)
+
+        return {
+            'case': 'argon2_pepper',
+            'hasher': 'Argon2id+Pepper',
+            'defenses': ['Pepper'],
             **attack_results
         }
         
@@ -258,6 +279,7 @@ class ExperimentRunner:
                 ('bcrypt_hasher', self.bcrypt_hasher_case),
                 ('plaintext_hasher', self.plaintext_hasher_case),
                 ('combined_defenses', self.combined_defenses_case),
+                ('argon2id+pepper_hashing' , self.argon2id_pepper_hashing_case)
             ]
             
             for case_name, case_func in cases:
