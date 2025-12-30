@@ -9,7 +9,7 @@ class User(BaseModel):
     totp_secret: str | None = None  # Used when the MFA defense is active
     locked_until: float = 0.0  # Used when the lockout defense is active
 
-    _internal_plain_password: str  # Used only for testing, excluded from API
+    internal_plain_password: str  # Used only for the experiment, not a real system
 
 
 class LoginRequest(BaseModel):

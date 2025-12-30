@@ -10,7 +10,7 @@ from src.server import hasher
 from src.server.api import router, DefenseMiddleware
 from src.server.db import InMemoryDB, init_db, get_db
 from src.server.defenses import MFADefense, RateLimitDefense, AccountLockoutDefense, CaptchaDefense
-from src.server.hasher import PlainTextHasher, get_hasher, Hasher, BCryptHasher, Argon2IDHasher
+from src.server.hasher import PlainTextHasher, Hasher, BCryptHasher, Argon2IDHasher
 from src.server.models import User
 
 
@@ -34,11 +34,11 @@ def set_users(user_list: list[dict]) -> None:
     db = get_db()
     if db is None:
         raise RuntimeError("Database not initialized. Please call server.start() before calling set_users().")
-    users = {}
+    db.clear()
     for entry in user_list:
         username = entry['username']
         password = entry['password']
-        hashed_password = get_hasher().hash_password(password)
+        hashed_password = hasher.get_hasher().hash_password(password)
         password_strength_class = entry['strength_class']
         totp_secret = entry['totp_secret']
 
@@ -47,10 +47,9 @@ def set_users(user_list: list[dict]) -> None:
             hashed_password=hashed_password,
             password_strength=password_strength_class,
             totp_secret=totp_secret,
-            _internal_plain_password=password
+            internal_plain_password=password
         )
-        users[username] = user
-    db.users = users
+        db.save_user(user)
 
 
 def set_hasher(hasher_config: HasherConfig) -> None:
@@ -61,6 +60,19 @@ def set_hasher(hasher_config: HasherConfig) -> None:
         HasherType.Argon2ID: Argon2IDHasher
     }
     hasher.set_hasher(hasher_map[hasher_config.hasher_type](hasher_config))
+    # Migrate all users to the new hash algorithm
+    db = get_db()
+    if db is None:
+        raise RuntimeError("Database not initialized. Please call server.start() before calling set_hasher().")
+    for user in db.users.values():
+        new_user = User(
+            username=user.username,
+            hashed_password=hasher.get_hasher().hash_password(user.internal_plain_password),
+            password_strength=user.password_strength,
+            totp_secret=user.totp_secret,
+            internal_plain_password=user.internal_plain_password
+        )
+        db.save_user(new_user)
 
 
 def set_defenses(*args: DefenseConfig) -> None:

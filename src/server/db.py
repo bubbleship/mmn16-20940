@@ -14,18 +14,34 @@ class DB(Protocol):
         """Retrieves a user from the database by username if it exists."""
         ...
 
+    @property
+    def users(self) -> dict[str, User]:
+        """Returns a dictionary of all users in the database."""
+        ...
+
+    def clear(self):
+        """Clears the database of all users."""
+        ...
+
 
 class InMemoryDB(DB):
     """Basic in-memory database implementation."""
 
     def __init__(self):
-        self.users: dict[str, User] = {}
+        self._users: dict[str, User] = {}
 
     def save_user(self, user: User) -> None:
-        self.users[user.username] = user
+        self._users[user.username] = user
 
     def get_user(self, username) -> User | None:
-        return self.users.get(username)
+        return self._users.get(username)
+
+    @property
+    def users(self) -> dict[str, User]:
+        return self._users
+
+    def clear(self):
+        self._users.clear()
 
 
 _db: DB | None = None
