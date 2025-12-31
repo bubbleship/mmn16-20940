@@ -79,12 +79,12 @@ class ExperimentRunner:
             timeout=timeout
         )
 
-    async def _run_attacks(self, target: str, include_password_spray: bool = True) -> Dict[str, Any]:
+    async def _run_attacks(self, target: str, brute_force_limit: int = 1_000, brute_force_timeout: int | None = None) -> Dict[str, Any]:
         """Execute both brute force and password spray attacks, measuring execution time."""
         results = {}
 
         # Run brute force attack
-        brute_force_gen = self._get_brute_force_generator(timeout=5 * 60)  # 5 minutes
+        brute_force_gen = self._get_brute_force_generator(max_attempts=brute_force_limit, timeout=brute_force_timeout)
         t0 = time.time()
 
         brute_force_summary = await self.brute_force_attacker.launch_attack(target, brute_force_gen)
@@ -96,19 +96,18 @@ class ExperimentRunner:
             'brute_force_time': brute_force_time,
         })
 
-        # Run password spray attack if requested
-        if include_password_spray:
-            t0 = time.time()
-            password_spray_summary = await self.password_spray_attacker.launch_attack(
-                self.password_spray_targets,
-                self.password_spray_collection
-            )
-            password_spray_time = time.time() - t0
+        # Run password spray attack
+        t0 = time.time()
+        password_spray_summary = await self.password_spray_attacker.launch_attack(
+            self.password_spray_targets,
+            self.password_spray_collection
+        )
+        password_spray_time = time.time() - t0
 
-            results.update({
-                'password_spray': password_spray_summary,
-                'password_spray_time': password_spray_time,
-            })
+        results.update({
+            'password_spray': password_spray_summary,
+            'password_spray_time': password_spray_time,
+        })
 
         return results
 
@@ -118,11 +117,11 @@ class ExperimentRunner:
         server.set_hasher(hasher_config)
         server.set_defenses()  # No defenses
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'control',
-            'hasher': hasher_config.hasher_type.value,
+            'hasher': hasher_config,
             'defenses': [],
             **attack_results
         }
@@ -137,27 +136,28 @@ class ExperimentRunner:
         server.set_hasher(hasher_config)
         server.set_defenses()
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'argon2_pepper',
-            'hasher': 'Argon2id+Pepper',
-            'defenses': ['Pepper'],
+            'hasher': hasher_config,
+            'defenses': [],
             **attack_results
         }
 
     async def mfa_case(self, target: str) -> Dict[str, Any]:
         """Run the MFA defense case."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [MFADefenseConfig()]
         server.set_hasher(hasher_config)
-        server.set_defenses(MFADefenseConfig())
+        server.set_defenses(*defenses_config)
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'mfa',
-            'hasher': hasher_config.hasher_type.value,
-            'defenses': ['MFA'],
+            'hasher': hasher_config,
+            'defenses': defenses_config,
             **attack_results
         }
 
@@ -167,65 +167,64 @@ class ExperimentRunner:
         Prevents MFA exhaustion attacks and brute-forcing of the TOTP token.
         """
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [MFADefenseConfig(), RateLimitDefenseConfig(rate=5, capacity=10)]  # Derived from literature review
         server.set_hasher(hasher_config)
+        server.set_defenses(*defenses_config)
 
-        # Implementing both defenses as recommended in the literature review
-        server.set_defenses(
-            RateLimitDefenseConfig(rate=5, capacity=10),
-            MFADefenseConfig()
-        )
-
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'mfa_plus_ratelimit',
-            'hasher': 'Argon2id',
-            'defenses': ['MFA', 'RateLimit'],
+            'hasher': hasher_config,
+            'defenses': defenses_config,
             **attack_results
         }
 
     async def rate_limit_case(self, target: str) -> Dict[str, Any]:
         """Run rate limiting defense case."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [RateLimitDefenseConfig(rate=10, capacity=20)]
         server.set_hasher(hasher_config)
-        server.set_defenses(RateLimitDefenseConfig(rate=10, capacity=20))
+        server.set_defenses(*defenses_config)
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'rate_limit',
-            'hasher': hasher_config.hasher_type.value,
-            'defenses': ['RateLimit'],
+            'hasher': hasher_config,
+            'defenses': defenses_config,
             **attack_results
         }
 
     async def account_lockout_case(self, target: str) -> Dict[str, Any]:
         """Run account lockout defense case."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [AccountLockoutDefenseConfig(max_attempts=5)]
         server.set_hasher(hasher_config)
-        server.set_defenses(AccountLockoutDefenseConfig(max_attempts=5))
+        server.set_defenses(*defenses_config)
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'account_lockout',
-            'hasher': hasher_config.hasher_type.value,
-            'defenses': ['AccountLockout'],
+            'hasher': hasher_config,
+            'defenses': defenses_config,
             **attack_results
         }
 
     async def captcha_case(self, target: str) -> Dict[str, Any]:
         """Run CAPTCHA defense case."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [CaptchaDefenseConfig(max_attempts=5)]
         server.set_hasher(hasher_config)
-        server.set_defenses(CaptchaDefenseConfig(max_attempts=5))
+        server.set_defenses(*defenses_config)
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'captcha',
-            'hasher': hasher_config.hasher_type.value,
-            'defenses': ['CAPTCHA'],
+            'hasher': hasher_config,
+            'defenses': defenses_config,
             **attack_results
         }
 
@@ -235,11 +234,11 @@ class ExperimentRunner:
         server.set_hasher(hasher_config)
         server.set_defenses()  # No defenses
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'bcrypt_hasher',
-            'hasher': hasher_config.hasher_type.value,
+            'hasher': hasher_config,
             'defenses': [],
             **attack_results
         }
@@ -250,11 +249,11 @@ class ExperimentRunner:
         server.set_hasher(hasher_config)
         server.set_defenses()  # No defenses
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'plaintext_hasher',
-            'hasher': hasher_config.hasher_type.value,
+            'hasher': hasher_config,
             'defenses': [],
             **attack_results
         }
@@ -267,62 +266,55 @@ class ExperimentRunner:
         """
         # Setting the secure baseline
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
-        server.set_hasher(hasher_config)
-
         # 1. Captcha starts after 3 failed attempts to stop bots.
         # 2. Lockout happens at 5 attempts (as per literature) as a final fail-safe.
-        server.set_defenses(
-            CaptchaDefenseConfig(max_attempts=3),
-            AccountLockoutDefenseConfig(max_attempts=5)
-        )
+        defenses_config = [CaptchaDefenseConfig(max_attempts=3), AccountLockoutDefenseConfig(max_attempts=5)]
+        server.set_hasher(hasher_config)
+        server.set_defenses(*defenses_config)
 
-        # Running attacks - this will demonstrate how CAPTCHA blocks the bot
+        # Running attacks - this will demonstrate how CAPTCHA blocks the automated attack
         # before it can trigger a full account lockout.
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'lockout_with_captcha',
-            'hasher': hasher_config.hasher_type.value,
-            'defenses': ['CAPTCHA', 'Account Lockout'],
+            'hasher': hasher_config,
+            'defenses': defenses_config,
             **attack_results
         }
 
     async def total_protection_case(self, target: str) -> Dict[str, Any]:
         """Maximum security: All defenses enabled simultaneously."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [RateLimitDefenseConfig(rate=5, capacity=10),
+                           CaptchaDefenseConfig(max_attempts=3),
+                           AccountLockoutDefenseConfig(max_attempts=5),
+                           MFADefenseConfig()]
         server.set_hasher(hasher_config)
+        server.set_defenses(*defenses_config)
 
-        server.set_defenses(
-            RateLimitDefenseConfig(rate=5, capacity=10),
-            CaptchaDefenseConfig(max_attempts=3),
-            AccountLockoutDefenseConfig(max_attempts=5),
-            MFADefenseConfig()
-        )
-
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'total_protection',
-            'hasher': 'Argon2id',
-            'defenses': ['RateLimit', 'CAPTCHA', 'Account Lockout', 'MFA'],
+            'hasher': hasher_config,
+            'defenses': defenses_config,
             **attack_results
         }
 
     async def combined_defenses_case(self, target: str) -> Dict[str, Any]:
         """Run a case with multiple defenses combined."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [RateLimitDefenseConfig(rate=5, capacity=10), AccountLockoutDefenseConfig(max_attempts=5)]
         server.set_hasher(hasher_config)
-        server.set_defenses(
-            RateLimitDefenseConfig(rate=5, capacity=10),
-            AccountLockoutDefenseConfig(max_attempts=5)
-        )
+        server.set_defenses(*defenses_config)
 
-        attack_results = await self._run_attacks(target, include_password_spray=True)
+        attack_results = await self._run_attacks(target)
 
         return {
             'case': 'combined_defenses',
-            'hasher': hasher_config.hasher_type.value,
-            'defenses': ['RateLimit', 'AccountLockout'],
+            'hasher': hasher_config,
+            'defenses': defenses_config,
             **attack_results
         }
 
