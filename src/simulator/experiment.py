@@ -97,6 +97,10 @@ class ExperimentRunner:
             'brute_force_time': brute_force_time,
         })
 
+        # Reset defense configuration before launching the next attack to prevent cross-contamination
+        # of the results with the previous attack
+        server.reset_defenses()
+
         # Run password spray attack
         t0 = time.time()
         password_spray_summary = await self.password_spray_attacker.launch_attack(

@@ -11,6 +11,7 @@ a clean interface for experimental scenarios to modify server behavior.
 """
 
 import threading
+from typing import Iterable
 
 import uvicorn
 from fastapi import FastAPI
@@ -144,6 +145,9 @@ def set_hasher(hasher_config: HasherConfig) -> None:
         db.save_user(new_user)
 
 
+_defenses_config_cache: Iterable[DefenseConfig] = []
+
+
 def set_defenses(*args: DefenseConfig) -> None:
     """
     Configure active defense mechanisms for the authentication server.
@@ -184,4 +188,18 @@ def set_defenses(*args: DefenseConfig) -> None:
         AccountLockoutDefenseConfig: AccountLockoutDefense,
         CaptchaDefenseConfig: CaptchaDefense
     }
+    global _defenses_config_cache
+    _defenses_config_cache = args
     api.set_defenses([defenses_map[type(config)](**config.as_dict()) for config in args])
+
+
+def reset_defenses() -> None:
+    """
+    Resets the defenses to the previously cached configuration. Equivalent to repeating
+    the last call to `set_defenses` with the same arguments.
+
+    Note:
+        Calling this method before `set_defenses` is equivalent to calling it with no
+        arguments.
+    """
+    set_defenses(*_defenses_config_cache)
