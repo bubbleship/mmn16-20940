@@ -1,3 +1,15 @@
+"""
+Password Security Experiment Server Control Module
+
+This module provides runtime control interfaces for configuring and managing
+the server during the experiment. It enables dynamic reconfiguration of
+cryptographic hashing algorithms, defense mechanisms, and user databases without
+requiring server restarts.
+
+This module abstracts the complexity of server state management and provides
+a clean interface for experimental scenarios to modify server behavior.
+"""
+
 import threading
 
 import uvicorn
@@ -15,6 +27,23 @@ from src.server.models import User
 
 
 def start(config: ServerConfig) -> None:
+    """
+    Initialize and start the experimental authentication server in daemon mode.
+    
+    Creates a FastAPI application instance with an authentication endpoint and
+    defense middleware, then launches it as a background daemon thread. Initializes
+    the in-memory database and sets a placeholder plaintext hasher.
+    
+    The server runs asynchronously to allow the experiment runner to continue
+    execution while maintaining server availability for attack simulations.
+    
+    Args:
+        config: Server configuration specifying host address and port binding.
+        
+    Note:
+        This function must be called before any other server control functions
+        to ensure proper initialization of the database.
+    """
     # Startup: Initialize the research environment
     init_db(InMemoryDB())
     hasher.set_hasher(PlainTextHasher(HasherConfig(hasher_type=HasherType.PlainText)))
@@ -31,6 +60,29 @@ def start(config: ServerConfig) -> None:
 
 
 def set_users(user_list: list[dict]) -> None:
+    """
+    Populate the server database with the given user accounts.
+    
+    Clears the existing user database and creates new user records from the provided
+    list. Each user account is configured with authentication credentials, password
+    strength classification, and TOTP secrets for multifactor authentication.
+    
+    Passwords are hashed using the currently configured hashing algorithm, while
+    preserving plaintext passwords for potential hasher migrations during the experiment.
+    
+    Args:
+        user_list: List of user dictionaries, each containing:
+            - 'username': Unique identifier for the user
+            - 'password': Plaintext password
+            - 'strength_class': Password strength category ('weak', 'medium', 'strong')
+            - 'totp_secret': Base32-encoded TOTP secret for MFA
+            
+    Raises:
+        RuntimeError: If the database is not initialized. Call start() first.
+        
+    Note:
+        This function replaces all existing users in the database.
+    """
     db = get_db()
     if db is None:
         raise RuntimeError("Database not initialized. Please call server.start() before calling set_users().")
@@ -53,7 +105,24 @@ def set_users(user_list: list[dict]) -> None:
 
 
 def set_hasher(hasher_config: HasherConfig) -> None:
-    """Sets the hasher to be used by the server."""
+    """
+    Dynamically configure the cryptographic hashing algorithm for password storage.
+    
+    Updates the server's password hashing mechanism and migrates all existing user
+    passwords to the new algorithm. This enables seamless transitions between hashing
+    strategies.
+    
+    Supported algorithms: plaintext (for control cases), BCrypt (legacy comparison),
+    and Argon2ID (modern standard), with optional pepper enhancement.
+    
+    Args:
+        hasher_config: Configuration object specifying the hashing algorithm type
+                      and optional parameters such as server-side pepper values.
+                      
+    Raises:
+        RuntimeError: If the database is not initialized. Call start() first.
+        KeyError: If the specified hasher type is not supported.
+    """
     hasher_map: dict[HasherType, type[Hasher]] = {
         HasherType.PlainText: PlainTextHasher,
         HasherType.BCrypt: BCryptHasher,
@@ -76,6 +145,39 @@ def set_hasher(hasher_config: HasherConfig) -> None:
 
 
 def set_defenses(*args: DefenseConfig) -> None:
+    """
+    Configure active defense mechanisms for the authentication server.
+    
+    Dynamically enables and configures security defenses based on the provided
+    configuration objects. Multiple defense mechanisms can be activated simultaneously
+    to test layered security approaches and identify potential conflicts or
+    synergistic effects between different protection strategies.
+    
+    Available defenses: multi-factor authentication (MFA), IP-based rate limiting,
+    account lockout mechanisms, and CAPTCHA.
+    
+    Args:
+        *args: Variable number of defense configuration objects. Supported types:
+            - MFADefenseConfig: Enables TOTP-based multifactor authentication
+            - RateLimitDefenseConfig: Configures IP-based request throttling  
+            - AccountLockoutDefenseConfig: Sets account lockout policies
+            - CaptchaDefenseConfig: Enables CAPTCHA challenges after failed attempts
+            
+    Note:
+        Calling this method overrides any existing defenses. Passing no arguments
+        disables all defenses. Defense activation is immediate and affects all
+        subsequent authentication requests without requiring server restart.
+        
+    Example:
+        # Enable MFA with rate limiting
+        set_defenses(
+            MFADefenseConfig(),
+            RateLimitDefenseConfig(rate=5, capacity=10)
+        )
+        
+        # Disable all defenses for baseline cases
+        set_defenses()
+    """
     defenses_map: dict[type[DefenseConfig], type] = {
         MFADefenseConfig: MFADefense,
         RateLimitDefenseConfig: RateLimitDefense,
