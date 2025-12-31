@@ -384,6 +384,7 @@ class ExperimentRunner:
         establish consistent baseline conditions.
         Password spray attacks are executed against all users to assess the effectiveness of defensive mechanisms. Unless
         stopped by a defense mechanism, password spray attacks should always succeed against weak and medium users.
+        The defense mechanisms are being reset between cases to ensure a clean baseline for each test case.
 
         Returns:
             Dict[str, Any]: A comprehensive results dictionary where each key represents a test case
