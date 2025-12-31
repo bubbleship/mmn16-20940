@@ -374,7 +374,52 @@ class ExperimentRunner:
         }
 
     async def run_all_cases(self) -> Dict[str, Any]:
-        """Run all experiment cases and return comprehensive results."""
+        """
+        Execute the password security experiment across multiple defense configurations.
+
+        This method orchestrates a systematic evaluation of the password-based authentication mechanisms
+        by running both brute force and password spray attacks against various combinations of cryptographic
+        hashing algorithms and defensive mechanisms.
+        The experiment targets a randomly selected user with weak password characteristics for brute force attacks to
+        establish consistent baseline conditions.
+        Password spray attacks are executed against all users to assess the effectiveness of defensive mechanisms. Unless
+        stopped by a defense mechanism, password spray attacks should always succeed against weak and medium users.
+
+        Returns:
+            Dict[str, Any]: A comprehensive results dictionary where each key represents a test case
+            identifier and each value contains the following structure:
+
+            For successful test cases:
+            {
+                'case': str,                    # Test case identifier (e.g., 'baseline_argon2id_control')
+                'hasher': HasherConfig,         # Cryptographic hashing configuration used
+                'defenses': List[DefenseConfig], # List of defense mechanisms applied (empty for baseline cases)
+                'brute_force': Dict[str, Dict[str, int]], # Brute force attack results by target username
+                'brute_force_time': float,      # Execution time in seconds for brute force attack
+                'password_spray': Dict[str, Dict[str, int]], # Password spray attack results by target username
+                'password_spray_time': float    # Execution time in seconds for password spray attack
+            }
+
+            Attack result dictionaries contain counters for each authentication outcome:
+            - 'SUCCESS': Successful authentication (attack succeeded)
+            - 'INVALID_CREDENTIALS': Wrong password provided
+            - 'USERNAME_NOT_FOUND': Target user does not exist
+            - 'MFA': Multi-factor authentication challenge triggered
+            - 'RATE_LIMIT': IP-based rate limiting activated
+            - 'ACCOUNT_LOCKOUT': Account locked due to failed attempts
+            - 'CAPTCHA': CAPTCHA challenge triggered
+            - 'INTERNAL_SERVER_ERROR': Server-side error occurred
+
+            For failed test cases (something went wrong during the experiment):
+            {
+                'error': str # Error message describing the failure cause
+            }
+
+            Test cases executed include baseline controls (plaintext, BCrypt, Argon2ID with/without pepper),
+            individual defense mechanisms (MFA, rate limiting, account lockout, CAPTCHA), combination
+            defenses (MFA+rate limiting, CAPTCHA+lockout, rate limiting+lockout), and comprehensive
+            defense stack with all mechanisms enabled.
+        """
         results = {}
 
         # Setup server and users
