@@ -2,7 +2,7 @@ import time
 import string
 import random
 import secrets
-from typing import Dict, Any
+from typing import Dict, Any, Awaitable, Callable
 from src.simulator.attackers import BruteForceAttacker, PasswordSprayAttacker
 from simulator.pattern_sim import brute_force
 from src.client.client import Client
@@ -79,7 +79,8 @@ class ExperimentRunner:
             timeout=timeout
         )
 
-    async def _run_attacks(self, target: str, brute_force_limit: int = 1_000, brute_force_timeout: int | None = None) -> Dict[str, Any]:
+    async def _run_attacks(self, target: str, brute_force_limit: int = 1_000, brute_force_timeout: int | None = None) -> \
+            Dict[str, Any]:
         """Execute both brute force and password spray attacks, measuring execution time."""
         results = {}
 
@@ -111,8 +112,50 @@ class ExperimentRunner:
 
         return results
 
-    async def control_case(self, target: str) -> Dict[str, Any]:
-        """Run the control case with Argon2ID hashing and no defenses."""
+    async def baseline_plaintext_control(self, target: str) -> Dict[str, Any]:
+        """
+        Plaintext password storage vulnerability baseline. Demonstrates the complete
+        lack of cryptographic protection to establish the worst-case scenario for
+        comparative security analysis.
+        """
+        hasher_config = HasherConfig(hasher_type=HasherType.PlainText)
+        server.set_hasher(hasher_config)
+        server.set_defenses()  # No defenses
+
+        attack_results = await self._run_attacks(target)
+
+        return {
+            'case': 'baseline_plaintext_control',
+            'hasher': hasher_config,
+            'defenses': [],
+            **attack_results
+        }
+
+    async def baseline_bcrypt_legacy_control(self, target: str) -> Dict[str, Any]:
+        """
+        Baseline control case measuring attack performance against legacy BCrypt hashing
+        without any defensive mechanisms. Establishes the fundamental security level provided
+        by cryptographic hashing alone.
+        """
+        hasher_config = HasherConfig(hasher_type=HasherType.BCrypt)
+        server.set_hasher(hasher_config)
+        server.set_defenses()  # No defenses
+
+        attack_results = await self._run_attacks(target)
+
+        return {
+            'case': 'baseline_bcrypt_legacy_control',
+            'hasher': hasher_config,
+            'defenses': [],
+            **attack_results
+        }
+
+    async def baseline_argon2id_control(self, target: str) -> Dict[str, Any]:
+        """
+        Baseline control case measuring attack performance against standard Argon2ID hashing
+        without any defensive mechanisms. Establishes the fundamental security level provided
+        by cryptographic hashing alone.
+        """
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
         server.set_hasher(hasher_config)
         server.set_defenses()  # No defenses
@@ -120,17 +163,21 @@ class ExperimentRunner:
         attack_results = await self._run_attacks(target)
 
         return {
-            'case': 'control',
+            'case': 'baseline_argon2id_control',
             'hasher': hasher_config,
             'defenses': [],
             **attack_results
         }
 
-    async def argon2id_pepper_hashing_case(self, target: str) -> Dict[str, Any]:
-        """Argon2ID hashing with a server-side Pepper."""
+    async def baseline_argon2id_pepper_control(self, target: str) -> Dict[str, Any]:
+        """
+        Baseline control case measuring attack performance against Argon2ID hashing with pepper
+        without any defensive mechanisms. Establishes the fundamental security level provided
+        by cryptographic hashing alone.
+        """
         hasher_config = HasherConfig(
             hasher_type=HasherType.Argon2ID,
-            pepper="3f7a1b8e9d2c4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9"
+            pepper=secrets.token_urlsafe(32)
         )
 
         server.set_hasher(hasher_config)
@@ -139,14 +186,19 @@ class ExperimentRunner:
         attack_results = await self._run_attacks(target)
 
         return {
-            'case': 'argon2_pepper',
+            'case': 'baseline_argon2id_pepper_control',
             'hasher': hasher_config,
             'defenses': [],
             **attack_results
         }
 
-    async def mfa_case(self, target: str) -> Dict[str, Any]:
-        """Run the MFA defense case."""
+    async def mfa_defense(self, target: str) -> Dict[str, Any]:
+        """
+        Measures the effectiveness of Multifactor authentication against both brute force and
+        password spray attacks.
+
+        Settings: MFA defense mechanism and Argon2ID hashing.
+        """
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
         defenses_config = [MFADefenseConfig()]
         server.set_hasher(hasher_config)
@@ -155,33 +207,19 @@ class ExperimentRunner:
         attack_results = await self._run_attacks(target)
 
         return {
-            'case': 'mfa',
+            'case': 'mfa_defense',
             'hasher': hasher_config,
             'defenses': defenses_config,
             **attack_results
         }
 
-    async def mfa_with_rate_limiting_case(self, target: str) -> Dict[str, Any]:
+    async def rate_limiting_defense(self, target: str) -> Dict[str, Any]:
         """
-        Literature Case: MFA combined with Rate Limiting.
-        Prevents MFA exhaustion attacks and brute-forcing of the TOTP token.
+        Measures the effectiveness of IP-based rate limiting against both brute force and password
+        spray attacks.
+
+        Settings: Rate limiting defense with rate=10 and capacity=20 and Argon2ID hashing.
         """
-        hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
-        defenses_config = [MFADefenseConfig(), RateLimitDefenseConfig(rate=5, capacity=10)]  # Derived from literature review
-        server.set_hasher(hasher_config)
-        server.set_defenses(*defenses_config)
-
-        attack_results = await self._run_attacks(target)
-
-        return {
-            'case': 'mfa_plus_ratelimit',
-            'hasher': hasher_config,
-            'defenses': defenses_config,
-            **attack_results
-        }
-
-    async def rate_limit_case(self, target: str) -> Dict[str, Any]:
-        """Run rate limiting defense case."""
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
         defenses_config = [RateLimitDefenseConfig(rate=10, capacity=20)]
         server.set_hasher(hasher_config)
@@ -190,14 +228,19 @@ class ExperimentRunner:
         attack_results = await self._run_attacks(target)
 
         return {
-            'case': 'rate_limit',
+            'case': 'rate_limiting_defense',
             'hasher': hasher_config,
             'defenses': defenses_config,
             **attack_results
         }
 
-    async def account_lockout_case(self, target: str) -> Dict[str, Any]:
-        """Run account lockout defense case."""
+    async def account_lockout_defense(self, target: str) -> Dict[str, Any]:
+        """
+        Measures the effectiveness of account lockout (or "username-based rate limiting") against
+        both brute force and password spray attacks.
+
+        Settings: Account lockout defense with max_attempts=5 and Argon2ID hashing.
+        """
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
         defenses_config = [AccountLockoutDefenseConfig(max_attempts=5)]
         server.set_hasher(hasher_config)
@@ -206,14 +249,18 @@ class ExperimentRunner:
         attack_results = await self._run_attacks(target)
 
         return {
-            'case': 'account_lockout',
+            'case': 'account_lockout_defense',
             'hasher': hasher_config,
             'defenses': defenses_config,
             **attack_results
         }
 
-    async def captcha_case(self, target: str) -> Dict[str, Any]:
-        """Run CAPTCHA defense case."""
+    async def captcha_defense(self, target: str) -> Dict[str, Any]:
+        """
+        Measures the effectiveness of CAPTCHA against both brute force and password spray attacks.
+
+        Settings: CAPTCHA defense with max_attempts=5 and Argon2ID hashing.
+        """
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
         defenses_config = [CaptchaDefenseConfig(max_attempts=5)]
         server.set_hasher(hasher_config)
@@ -222,47 +269,41 @@ class ExperimentRunner:
         attack_results = await self._run_attacks(target)
 
         return {
-            'case': 'captcha',
+            'case': 'captcha_defense',
             'hasher': hasher_config,
             'defenses': defenses_config,
             **attack_results
         }
 
-    async def bcrypt_hasher_case(self, target: str) -> Dict[str, Any]:
-        """Run the control case with BCrypt hasher instead of Argon2ID."""
-        hasher_config = HasherConfig(hasher_type=HasherType.BCrypt)
-        server.set_hasher(hasher_config)
-        server.set_defenses()  # No defenses
-
-        attack_results = await self._run_attacks(target)
-
-        return {
-            'case': 'bcrypt_hasher',
-            'hasher': hasher_config,
-            'defenses': [],
-            **attack_results
-        }
-
-    async def plaintext_hasher_case(self, target: str) -> Dict[str, Any]:
-        """Run case with plaintext hasher (for comparison)."""
-        hasher_config = HasherConfig(hasher_type=HasherType.PlainText)
-        server.set_hasher(hasher_config)
-        server.set_defenses()  # No defenses
-
-        attack_results = await self._run_attacks(target)
-
-        return {
-            'case': 'plaintext_hasher',
-            'hasher': hasher_config,
-            'defenses': [],
-            **attack_results
-        }
-
-    async def lockout_with_captcha_case(self, target: str) -> Dict[str, Any]:
+    async def mfa_rate_limiting_combination(self, target: str) -> Dict[str, Any]:
         """
-        Literature-Based Combo: Account Lockout protected by CAPTCHA.
-        As noted in the review, CAPTCHA prevents automated DoS attacks
-        aimed at locking out legitimate users.
+        Measures the synergistic effectiveness of MFA and IP-based rate limiting against both brute
+        force and password spray attacks.
+
+        Settings: MFA defense mechanism, rate limiting defense with rate=5 and capacity=10, and Argon2ID hashing.
+        """
+        hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [MFADefenseConfig(), RateLimitDefenseConfig(rate=5, capacity=10)]
+        server.set_hasher(hasher_config)
+        server.set_defenses(*defenses_config)
+
+        attack_results = await self._run_attacks(target)
+
+        return {
+            'case': 'mfa_rate_limiting_combination',
+            'hasher': hasher_config,
+            'defenses': defenses_config,
+            **attack_results
+        }
+
+    async def captcha_account_lockout_combination(self, target: str) -> Dict[str, Any]:
+        """
+        Measures the synergistic effectiveness of CAPTCHA and account lockout against both brute force
+        and password spray attacks.
+        Aims to prevent DoS from account lockout abuse by activating the CAPTCHA mechanism first.
+
+        Settings: CAPTCHA defense with max_attempts=3, account lockout defense with max_attempts=5, and Argon2ID
+        hashing.
         """
         # Setting the secure baseline
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
@@ -277,33 +318,20 @@ class ExperimentRunner:
         attack_results = await self._run_attacks(target)
 
         return {
-            'case': 'lockout_with_captcha',
+            'case': 'captcha_lockout_hybrid_defense',
             'hasher': hasher_config,
             'defenses': defenses_config,
             **attack_results
         }
 
-    async def total_protection_case(self, target: str) -> Dict[str, Any]:
-        """Maximum security: All defenses enabled simultaneously."""
-        hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
-        defenses_config = [RateLimitDefenseConfig(rate=5, capacity=10),
-                           CaptchaDefenseConfig(max_attempts=3),
-                           AccountLockoutDefenseConfig(max_attempts=5),
-                           MFADefenseConfig()]
-        server.set_hasher(hasher_config)
-        server.set_defenses(*defenses_config)
+    async def rate_limit_account_lockout_combination(self, target: str) -> Dict[str, Any]:
+        """
+        Measures the synergistic effectiveness of IP-based rate limiting and account lockout against both
+        brute force and password spray attacks.
 
-        attack_results = await self._run_attacks(target)
-
-        return {
-            'case': 'total_protection',
-            'hasher': hasher_config,
-            'defenses': defenses_config,
-            **attack_results
-        }
-
-    async def combined_defenses_case(self, target: str) -> Dict[str, Any]:
-        """Run a case with multiple defenses combined."""
+        Settings: Rate limiting defense with rate=5 and capacity=10, and account lockout defense with max_attempts=5,
+        and Argon2ID hashing.
+        """
         hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
         defenses_config = [RateLimitDefenseConfig(rate=5, capacity=10), AccountLockoutDefenseConfig(max_attempts=5)]
         server.set_hasher(hasher_config)
@@ -312,7 +340,34 @@ class ExperimentRunner:
         attack_results = await self._run_attacks(target)
 
         return {
-            'case': 'combined_defenses',
+            'case': 'rate_limit_account_lockout_combination',
+            'hasher': hasher_config,
+            'defenses': defenses_config,
+            **attack_results
+        }
+
+    async def comprehensive_defense_stack(self, target: str) -> Dict[str, Any]:
+        """
+        Measures the synergistic effectiveness of all the defense mechanisms against both brute force and
+        password spray attacks.
+        Aims to test the cumulative effectiveness of layered security controls and identifies potential
+        conflicts or performance impacts.
+
+        Settings: MFA defense mechanism, rate limiting defense with rate=5 and capacity=10, account lockout
+        defense with max_attempts=5, CAPTCHA defense with max_attempts=3, and Argon2ID hashing.
+        """
+        hasher_config = HasherConfig(hasher_type=HasherType.Argon2ID)
+        defenses_config = [MFADefenseConfig(),
+                           RateLimitDefenseConfig(rate=5, capacity=10),
+                           AccountLockoutDefenseConfig(max_attempts=5),
+                           CaptchaDefenseConfig(max_attempts=3)]
+        server.set_hasher(hasher_config)
+        server.set_defenses(*defenses_config)
+
+        attack_results = await self._run_attacks(target)
+
+        return {
+            'case': 'comprehensive_defense_stack',
             'hasher': hasher_config,
             'defenses': defenses_config,
             **attack_results
@@ -333,28 +388,31 @@ class ExperimentRunner:
             target = random.choice(self.weak_users)['username']
             print(f"Running experiment with target user: {target}")
 
-            # Run all cases
-            cases = [
-                ('control', self.control_case),
-                ('mfa', self.mfa_case),
-                ('rate_limit', self.rate_limit_case),
-                ('account_lockout', self.account_lockout_case),
-                ('captcha', self.captcha_case),
-                ('bcrypt_hasher', self.bcrypt_hasher_case),
-                ('plaintext_hasher', self.plaintext_hasher_case),
-                ('combined_defenses', self.combined_defenses_case),
-                ('argon2id+pepper_hashing', self.argon2id_pepper_hashing_case),
-                ('mfa_with_rate_limiting', self.mfa_with_rate_limiting_case),
-                ('lockout_with_captcha_case', self.lockout_with_captcha_case)
+            # Define all test cases
+            cases: list[Callable[[str], Awaitable[Dict[str, Any]]]] = [
+                self.baseline_plaintext_control,
+                self.baseline_bcrypt_legacy_control,
+                self.baseline_argon2id_control,
+                self.baseline_argon2id_pepper_control,
+                self.mfa_defense,
+                self.rate_limiting_defense,
+                self.account_lockout_defense,
+                self.captcha_defense,
+                self.mfa_rate_limiting_combination,
+                self.captcha_account_lockout_combination,
+                self.rate_limit_account_lockout_combination,
+                self.comprehensive_defense_stack,
             ]
 
-            for case_name, case_func in cases:
-                print(f"Running {case_name} case...")
+            for case_func in cases:
+                print(f"Running {case_func.__name__} case...")
                 try:
                     case_result = await case_func(target)
+                    case_name = case_result['case']
                     results[case_name] = case_result
                     print(f"✓ {case_name} case completed")
                 except Exception as e:
+                    case_name = case_func.__name__
                     print(f"✗ {case_name} case failed: {str(e)}")
                     results[case_name] = {'error': str(e)}
 
