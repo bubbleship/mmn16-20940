@@ -3,6 +3,8 @@ import string
 import random
 import secrets
 from typing import Dict, Any, Awaitable, Callable
+
+from simulator.postprocessor import run_postprocessing
 from src.simulator.attackers import BruteForceAttacker, PasswordSprayAttacker
 from simulator.pattern_sim import brute_force
 from src.client.client import Client
@@ -504,4 +506,13 @@ async def run_experiment():
                 print(f"  Password Spray Time: {case_result['password_spray_time']:.2f}s")
             print()
 
-    return results
+    # Run postprocessing
+    enhanced_results = run_postprocessing(
+        results=results,
+        users=experiment.users,
+        password_config=experiment.password_config,
+        output_dir="results"
+    )
+
+
+    return enhanced_results
