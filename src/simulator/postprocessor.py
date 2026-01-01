@@ -5,7 +5,7 @@ This module provides analysis and visualization capabilities for experiment resu
 It calculates performance metrics, estimates attack success probabilities, and
 generates visualizations for the research report.
 """
-
+import statistics
 import json
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,6 +30,10 @@ class AttackMetrics:
     requests_per_second: float
     success_rate: float
     estimated_success_time: Optional[float]
+    # New metrics for the assignment requirements
+    median_latency: float = 0.0
+    p90_latency: float = 0.0
+    avg_latency: float = 0.0
 
 
 @dataclass
@@ -130,24 +134,39 @@ class ResultsPostprocessor:
         total_attempts = 0
         successful_attempts = 0
         blocked_attempts = 0
+        all_latencies = []
 
-        # Sum up attempts across all targets
-        for target_results in attack_summary.values():
-            for result_type, count in target_results.items():
-                total_attempts += count
-                if result_type == 'SUCCESS':
-                    successful_attempts += count
-                elif result_type in ['RATE_LIMIT', 'ACCOUNT_LOCKOUT', 'CAPTCHA', 'MFA']:
-                    blocked_attempts += count
+
+        for target_name, target_data in attack_summary.items():
+            # In our new Attacker, target_data is a dict or defaultdict
+            # We must handle both the counts and the 'latencies' key
+            for key, value in target_data.items():
+                if key == 'latencies':
+                    all_latencies.extend(value)
+                elif isinstance(value, int):
+                    total_attempts += value
+                    if key == 'SUCCESS':
+                        successful_attempts += value
+                    elif key in ['RATE_LIMIT', 'ACCOUNT_LOCKOUT', 'CAPTCHA', 'MFA']:
+                        blocked_attempts += value
 
         # Calculate rates
         requests_per_second = total_attempts / attack_time if attack_time > 0 else 0
         success_rate = successful_attempts / total_attempts if total_attempts > 0 else 0
 
-        # Estimate theoretical success time for weak passwords
+        # Statistical analysis of latencies
+        median_lat = 0.0
+        p90_lat = 0.0
+        avg_lat = 0.0
+
+        if all_latencies:
+            median_lat = float(np.median(all_latencies))
+            p90_lat = float(np.percentile(all_latencies, 90))
+            avg_lat = float(np.mean(all_latencies))
+
+        # Estimate theoretical success time
         estimated_success_time = None
         if attack_type == 'brute_force' and requests_per_second > 0:
-            # Average case: expect to find password in middle of keyspace
             expected_attempts = self.password_analysis.theoretical_keyspace['weak'] / 2
             estimated_success_time = expected_attempts / requests_per_second
 
@@ -157,8 +176,51 @@ class ResultsPostprocessor:
             blocked_attempts=blocked_attempts,
             requests_per_second=requests_per_second,
             success_rate=success_rate,
-            estimated_success_time=estimated_success_time
+            estimated_success_time=estimated_success_time,
+            median_latency=median_lat,
+            p90_latency=p90_lat,
+            avg_latency=avg_lat
         )
+
+    def _plot_latency_distribution(self, results: Dict[str, Any]) -> None:
+        """
+        Generates a Box Plot to show latency distribution across different Hashers/Defenses.
+        This directly addresses the 'Median' and 'Distribution' requirement.
+        """
+        plt.figure(figsize=(12, 7))
+
+        plot_data = []
+        labels = []
+
+        for case_name, case_result in results.items():
+            # Collect all latencies for this test case
+            case_latencies = []
+            if 'brute_force' in case_result:
+                for target_data in case_result['brute_force'].values():
+                    if 'latencies' in target_data:
+                        case_latencies.extend(target_data['latencies'])
+
+            if case_latencies:
+                plot_data.append(case_latencies)
+                labels.append(case_name.replace('_', ' ').title())
+
+        if not plot_data:
+            return
+
+        # Create BoxPlot
+        bplot = plt.boxplot(plot_data, labels=labels, patch_artist=True, vert=False)
+
+        # Color the boxes based on category
+        for i, patch in enumerate(bplot['boxes']):
+            category = self._categorize_case(list(results.keys())[i])
+            patch.set_facecolor(self.defense_colors.get(category, '#888888'))
+
+        plt.xlabel('Latency (Seconds)')
+        plt.title('Latency Distribution by Test Case (Median and Quartiles)', fontsize=14, fontweight='bold')
+        plt.grid(axis='x', alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(self.output_dir / 'latency_distribution_boxplot.png', dpi=300)
+        plt.close()
 
     @staticmethod
     def _categorize_case(case_name: str) -> str:
@@ -211,6 +273,8 @@ class ResultsPostprocessor:
                     'blocked_attempts': bf_metrics.blocked_attempts,
                     'requests_per_second': bf_metrics.requests_per_second,
                     'success_rate': bf_metrics.success_rate,
+                    'median_latency': bf_metrics.median_latency,
+                    'p90_latency': bf_metrics.p90_latency,
                     'estimated_success_time_seconds': bf_metrics.estimated_success_time,
                     'estimated_success_time_hours': bf_metrics.estimated_success_time / 3600 if bf_metrics.estimated_success_time else None
                 }
@@ -226,6 +290,8 @@ class ResultsPostprocessor:
                     'total_attempts': ps_metrics.total_attempts,
                     'successful_attempts': ps_metrics.successful_attempts,
                     'blocked_attempts': ps_metrics.blocked_attempts,
+                    'median_latency': bf_metrics.median_latency,
+                    'p90_latency': bf_metrics.p90_latency,
                     'requests_per_second': ps_metrics.requests_per_second,
                     'success_rate': ps_metrics.success_rate
                 }
@@ -284,6 +350,7 @@ class ResultsPostprocessor:
             return
 
         # Generate individual plots
+        self._plot_latency_distribution(valid_results)
         self._plot_requests_per_second_comparison(valid_results)
         self._plot_success_rate_comparison(valid_results)
         self._plot_estimated_attack_time(valid_results)

@@ -62,8 +62,16 @@ class BruteForceAttacker(Attacker):
             A summary of the attack.
         """
         summary = {target: defaultdict(int)}
+        # Added for performance analysis
+        summary[target]['latencies'] = []
+
         for pattern in patterns:
+            start_time = asyncio.get_event_loop().time()
             result = await self.attempt_login(target, pattern)
+            latency = asyncio.get_event_loop().time() - start_time
+
+            summary[target]['latencies'].append(latency)
+
             await asyncio.sleep(delay)
             if result is Result.INVALID_CREDENTIALS:
                 summary[target][result] += 1
@@ -90,9 +98,18 @@ class PasswordSprayAttacker(Attacker):
             A summary of the attack.
         """
         summary = {target: defaultdict(int) for target in targets}
+        # Added for performance analysis
+        for target in targets:
+            summary[target]['latencies'] = []
+
         for pattern in patterns:
             for target in targets:
+                start_time = asyncio.get_event_loop().time()
                 result = await self.attempt_login(target, pattern)
+                latency = asyncio.get_event_loop().time() - start_time
+
+                summary[target]['latencies'].append(latency)
+
                 await asyncio.sleep(delay)
                 if result is Result.INVALID_CREDENTIALS:
                     summary[target][result] += 1
