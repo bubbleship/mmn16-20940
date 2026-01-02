@@ -134,37 +134,30 @@ class ResultsPostprocessor:
         total_attempts = 0
         successful_attempts = 0
         blocked_attempts = 0
-        all_latencies = []
 
+        collected_medians = []
 
         for target_name, target_data in attack_summary.items():
-            # In our new Attacker, target_data is a dict or defaultdict
-            # We must handle both the counts and the 'latencies' key
+            # Retrieve pre-calculated median from _run_attacks
+            if 'latency_median' in target_data:
+                collected_medians.append(target_data['latency_median'])
+
             for key, value in target_data.items():
-                if key == 'latencies':
-                    all_latencies.extend(value)
-                elif isinstance(value, int):
+                if isinstance(value, int):
                     total_attempts += value
                     if key == 'SUCCESS':
                         successful_attempts += value
                     elif key in ['RATE_LIMIT', 'ACCOUNT_LOCKOUT', 'CAPTCHA', 'MFA']:
                         blocked_attempts += value
 
-        # Calculate rates
+        # Use the mean of medians to represent the overall case latency
+        median_lat = statistics.mean(collected_medians) if collected_medians else 0.0
+        avg_lat = median_lat
+        p90_lat = max(collected_medians) if collected_medians else 0.0
+
         requests_per_second = total_attempts / attack_time if attack_time > 0 else 0
         success_rate = successful_attempts / total_attempts if total_attempts > 0 else 0
 
-        # Statistical analysis of latencies
-        median_lat = 0.0
-        p90_lat = 0.0
-        avg_lat = 0.0
-
-        if all_latencies:
-            median_lat = float(np.median(all_latencies))
-            p90_lat = float(np.percentile(all_latencies, 90))
-            avg_lat = float(np.mean(all_latencies))
-
-        # Estimate theoretical success time
         estimated_success_time = None
         if attack_type == 'brute_force' and requests_per_second > 0:
             expected_attempts = self.password_analysis.theoretical_keyspace['weak'] / 2
@@ -183,43 +176,44 @@ class ResultsPostprocessor:
         )
 
     def _plot_latency_distribution(self, results: Dict[str, Any]) -> None:
-        """
-        Generates a Box Plot to show latency distribution across different Hashers/Defenses.
-        This directly addresses the 'Median' and 'Distribution' requirement.
-        """
+        """Generates a Bar Plot showing the median latency for each case."""
         plt.figure(figsize=(12, 7))
 
-        plot_data = []
-        labels = []
+        cases = []
+        medians = []
+        colors = []
 
         for case_name, case_result in results.items():
-            # Collect all latencies for this test case
-            case_latencies = []
+            case_medians = []
             if 'brute_force' in case_result:
                 for target_data in case_result['brute_force'].values():
-                    if 'latencies' in target_data:
-                        case_latencies.extend(target_data['latencies'])
+                    if 'latency_median' in target_data:
+                        case_medians.append(target_data['latency_median'])
 
-            if case_latencies:
-                plot_data.append(case_latencies)
-                labels.append(case_name.replace('_', ' ').title())
+            if case_medians:
+                cases.append(case_name.replace('_', ' ').title())
+                avg_median = statistics.mean(case_medians)
+                medians.append(avg_median)
 
-        if not plot_data:
+                category = self._categorize_case(case_name)
+                colors.append(self.defense_colors.get(category, '#888888'))
+
+        if not medians:
             return
 
-        # Create BoxPlot
-        bplot = plt.boxplot(plot_data, labels=labels, patch_artist=True, vert=False)
+        bars = plt.barh(cases, medians, color=colors)
+        plt.xlabel('Median Latency (Seconds)')
+        plt.title('Comparison of Median Latency Across Test Cases', fontsize=14, fontweight='bold')
 
-        # Color the boxes based on category
-        for i, patch in enumerate(bplot['boxes']):
-            category = self._categorize_case(list(results.keys())[i])
-            patch.set_facecolor(self.defense_colors.get(category, '#888888'))
+        # Add value labels for better readability
+        for bar in bars:
+            width = bar.get_width()
+            plt.text(width, bar.get_y() + bar.get_height() / 2, f' {width:.4f}s',
+                     va='center', ha='left', fontsize=10)
 
-        plt.xlabel('Latency (Seconds)')
-        plt.title('Latency Distribution by Test Case (Median and Quartiles)', fontsize=14, fontweight='bold')
         plt.grid(axis='x', alpha=0.3)
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'latency_distribution_boxplot.png', dpi=300)
+        plt.savefig(self.output_dir / 'latency_comparison.png', dpi=300)
         plt.close()
 
     @staticmethod
@@ -651,19 +645,23 @@ class ResultsPostprocessor:
                     dpi=300, bbox_inches='tight')
         plt.close()
 
+
+
     def _plot_attack_outcome_distribution(self, results: Dict[str, Any]) -> None:
         """Generate attack outcome distribution charts."""
-        # Collect all possible outcomes
         all_outcomes = set()
         case_outcomes = {}
 
         for case_name, case_result in results.items():
             case_outcomes[case_name] = {}
 
-            # Aggregate outcomes from brute force
             if 'brute_force' in case_result:
                 for target_results in case_result['brute_force'].values():
                     for outcome, count in target_results.items():
+                        # Skip latency list to avoid TypeError during summation
+                        if outcome == 'latencies':
+                            continue
+
                         all_outcomes.add(outcome)
                         case_outcomes[case_name][outcome] = case_outcomes[case_name].get(outcome, 0) + count
 
@@ -672,13 +670,10 @@ class ResultsPostprocessor:
         if len(outcomes_list) <= 1:
             return
 
-        # Create stacked bar chart
         fig, ax = plt.subplots(1, 1, figsize=(16, 10))
-
         cases = list(case_outcomes.keys())
         bottom = np.zeros(len(cases))
 
-        # Define colors for outcomes
         outcome_colors = {
             'SUCCESS': '#ff4444',
             'INVALID_CREDENTIALS': '#ffaa44',

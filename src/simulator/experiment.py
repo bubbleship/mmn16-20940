@@ -3,7 +3,7 @@ import string
 import random
 import secrets
 from typing import Dict, Any, Awaitable, Callable
-
+import statistics
 from simulator.postprocessor import run_postprocessing
 from src.simulator.attackers import BruteForceAttacker, PasswordSprayAttacker
 from simulator.pattern_sim import brute_force
@@ -81,6 +81,22 @@ class ExperimentRunner:
             timeout=timeout
         )
 
+    def _process_latency_stats(self, summary_dict: Dict[str, Any]):
+        """Helper to replace raw latency lists with statistical summaries."""
+        for user_data in summary_dict.values():
+            if isinstance(user_data, dict) and 'latencies' in user_data:
+                latencies = user_data['latencies']
+                if latencies:
+
+                    user_data['latency_median'] = statistics.median(latencies)
+                    user_data['latency_std_dev'] = statistics.stdev(latencies) if len(latencies) > 1 else 0
+                    user_data['latency_max'] = max(latencies)
+                    user_data['latency_min'] = min(latencies)
+
+                # delete long list from summery to reduce json space
+                del user_data['latencies']
+
+
     async def _run_attacks(self, target: str, brute_force_limit: int = 1_000, brute_force_timeout: int | None = None) -> \
             Dict[str, Any]:
         """Execute both brute force and password spray attacks, measuring execution time."""
@@ -93,6 +109,9 @@ class ExperimentRunner:
         brute_force_summary = await self.brute_force_attacker.launch_attack(target, brute_force_gen)
 
         brute_force_time = time.time() - t0
+
+        #Process Latency
+        self._process_latency_stats(brute_force_summary)
 
         results.update({
             'brute_force': brute_force_summary,
@@ -110,6 +129,9 @@ class ExperimentRunner:
             self.password_spray_collection
         )
         password_spray_time = time.time() - t0
+
+        #process latency
+        self._process_latency_stats(password_spray_summary)
 
         results.update({
             'password_spray': password_spray_summary,
