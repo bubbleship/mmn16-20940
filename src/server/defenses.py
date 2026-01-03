@@ -39,11 +39,11 @@ class MFADefense(Defense):
     """Multi-Factor Authentication (MFA) Defense that checks the user's TOTP token against the secret stored in the database."""
 
     async def pre_login(self, request: Request, login_request: LoginRequest, user: User) -> bool:
-        totp = pyotp.TOTP(user.totp_secret)
-        return totp.verify(login_request.totp_token)
+        return True
 
     async def post_login(self, request: Request, response: Response, login_request: LoginRequest, user: User) -> bool:
-        return True
+        totp = pyotp.TOTP(user.totp_secret)
+        return totp.verify(login_request.totp_token)
 
     @property
     def response(self) -> Response:
