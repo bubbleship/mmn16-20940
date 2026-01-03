@@ -51,7 +51,7 @@ class ExperimentRunner:
     def setup_users(self):
         """Generate and categorize users for the experiment."""
         self.users = generate_users(30, self.password_config)
-        save_users(self.users)
+        save_users(self.users, dir_path='results')
 
         # Categorize users by password strength
         self.weak_users = list(filter(lambda u: u['strength_class'] == 'weak', self.users))

@@ -1,6 +1,16 @@
+import logging
+from pathlib import Path
+
 import httpx
 
 from src.config.config import ClientConfig
+
+Path("results").mkdir(parents=True, exist_ok=True)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+file_handler = logging.FileHandler(filename="results/requests.log")
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+logger.addHandler(file_handler)
 
 
 class Client:
@@ -30,7 +40,8 @@ class Client:
             json=data,
             headers={"Content-Type": "application/json"}
         )
-
+        logger.info(
+            f"POST login {data} - Status: {response.status_code} - Body: {response.text} - {self.config.group_seed}")
         return response
 
     async def __aenter__(self) -> 'Client':

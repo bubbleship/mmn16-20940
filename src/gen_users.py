@@ -1,6 +1,7 @@
 import csv
 import secrets
 import string
+from pathlib import Path
 
 import pyotp
 
@@ -36,8 +37,9 @@ def generate_users(count: int, config: PasswordConfig) -> list[dict]:
     return users
 
 
-def save_users(users: list[dict]):
-    with open("users.csv", "w", newline="") as f:
+def save_users(users: list[dict], dir_path: str = "."):
+    path = Path(dir_path) / "users.csv"
+    with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["username", "password", "totp_secret", "strength_class"])
         writer.writeheader()
         writer.writerows(users)
