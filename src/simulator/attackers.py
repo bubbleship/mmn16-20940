@@ -56,7 +56,7 @@ class BruteForceAttacker(Attacker):
         Args:
             target: username to target in the attack
             patterns: an iterable of passwords to try against the targets
-            delay: the delay between each password attempt, in seconds. Defaults to None.
+            delay: the delay between each password attempt, in seconds. Defaults to None
 
         Returns:
             A summary of the attack.
