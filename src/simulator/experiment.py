@@ -72,7 +72,8 @@ class ExperimentRunner:
         self.brute_force_attacker = BruteForceAttacker(client)
         self.password_spray_attacker = PasswordSprayAttacker(client)
 
-    def _get_brute_force_generator(self, password_rig: str, max_attempts: int = 1_000, timeout: int | None = None):
+    def _get_brute_force_generator(self, password_rig: str | None = None, max_attempts: int = 1_000,
+                                   timeout: int | None = None):
         """Get brute force password generator for weak passwords."""
         return brute_force(
             self.password_config.weak_alphabet,
@@ -96,16 +97,13 @@ class ExperimentRunner:
                 # delete the long list from summery to reduce JSON size
                 del user_data['latencies']
 
-    async def _run_attacks(self, target: str, brute_force_limit: int = 1_000, brute_force_timeout: int | None = None) -> \
+    async def _run_attacks(self, target: str, brute_force_limit: int = 10_000, brute_force_timeout: int | None = None) -> \
             Dict[str, Any]:
         """Execute both brute force and password spray attacks, measuring execution time."""
         results = {}
 
         # Run brute force attack
-        brute_force_password_rig = next((user for user in self.users if user['username'] == target), {}).get('password',
-                                                                                                             '')
-        brute_force_gen = self._get_brute_force_generator(password_rig=brute_force_password_rig,
-                                                          max_attempts=brute_force_limit, timeout=brute_force_timeout)
+        brute_force_gen = self._get_brute_force_generator(max_attempts=brute_force_limit, timeout=brute_force_timeout)
         t0 = time.time()
 
         brute_force_summary = await self.brute_force_attacker.launch_attack(target, brute_force_gen)
