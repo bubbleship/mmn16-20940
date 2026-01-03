@@ -97,7 +97,8 @@ class ExperimentRunner:
                 # delete the long list from summery to reduce JSON size
                 del user_data['latencies']
 
-    async def _run_attacks(self, target: str, brute_force_limit: int = 10_000, brute_force_timeout: int | None = None) -> \
+    async def _run_attacks(self, target: str, brute_force_limit: int = 10_000,
+                           brute_force_timeout: int | None = None) -> \
             Dict[str, Any]:
         """Execute both brute force and password spray attacks, measuring execution time."""
         results = {}
@@ -169,7 +170,7 @@ class ExperimentRunner:
         server.set_hasher(hasher_config)
         server.set_defenses()  # No defenses
 
-        attack_results = await self._run_attacks(target)
+        attack_results = await self._run_attacks(target, brute_force_timeout=5 * 60)  # 5 minutes
 
         return {
             'case': 'baseline_bcrypt_legacy_control',
