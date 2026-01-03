@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
+from src.config.config import GROUP_SEED
+
 # Set up the plotting style
 plt.style.use('default')
 sns.set_palette("husl")
@@ -305,6 +307,7 @@ class ResultsPostprocessor:
             enhanced_results: Processed results with calculated metrics
         """
         output_data = {
+            'GROUP SEED': GROUP_SEED,
             'experiment_metadata': {
                 'timestamp': datetime.now().isoformat(),
                 'total_cases': len(enhanced_results),
@@ -644,8 +647,6 @@ class ResultsPostprocessor:
         plt.savefig(self.output_dir / 'hasher_performance_comparison.png',
                     dpi=300, bbox_inches='tight')
         plt.close()
-
-
 
     def _plot_attack_outcome_distribution(self, results: Dict[str, Any]) -> None:
         """Generate attack outcome distribution charts."""
