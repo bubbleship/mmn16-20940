@@ -28,8 +28,8 @@ class ExperimentRunner:
             admin_url='http://localhost:8080/admin'
         )
         self.password_config = PasswordConfig(
-            weak_alphabet=string.ascii_lowercase,
-            weak_length=6,
+            weak_alphabet=string.digits,
+            weak_length=4,
             medium_alphabet=string.ascii_lowercase + string.digits,
             medium_length=8,
             strong_alphabet=string.ascii_letters + string.digits + string.punctuation,
@@ -170,7 +170,7 @@ class ExperimentRunner:
         server.set_hasher(hasher_config)
         server.set_defenses()  # No defenses
 
-        attack_results = await self._run_attacks(target, brute_force_timeout=5 * 60)  # 5 minutes
+        attack_results = await self._run_attacks(target, brute_force_timeout=10 * 60)  # 10 minutes
 
         return {
             'case': 'baseline_bcrypt_legacy_control',
