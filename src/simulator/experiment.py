@@ -4,9 +4,9 @@ import random
 import secrets
 from typing import Dict, Any, Awaitable, Callable
 import statistics
-from simulator.postprocessor import run_postprocessing
+from src.simulator.postprocessor import run_postprocessing
 from src.simulator.attackers import BruteForceAttacker, PasswordSprayAttacker
-from simulator.pattern_sim import brute_force
+from src.simulator.pattern_sim import brute_force
 from src.client.client import Client
 from src.gen_users import generate_users, save_users
 from src.server import server

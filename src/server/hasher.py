@@ -4,7 +4,7 @@ import bcrypt
 from argon2 import PasswordHasher, Type as Argon2Type
 from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
-from config.config import HasherConfig
+from src.config.config import HasherConfig
 
 
 class Hasher(Protocol):
