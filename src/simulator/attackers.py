@@ -98,12 +98,14 @@ class PasswordSprayAttacker(Attacker):
             A summary of the attack.
         """
         summary = {target: defaultdict(int) for target in targets}
+        targets = set(targets)
         # Added for performance analysis
         for target in targets:
             summary[target]['latencies'] = []
 
         for pattern in patterns:
-            for target in targets:
+            targets_iter = targets.copy()
+            for target in targets_iter:
                 start_time = asyncio.get_event_loop().time()
                 result = await self.attempt_login(target, pattern)
                 latency = asyncio.get_event_loop().time() - start_time
@@ -116,5 +118,5 @@ class PasswordSprayAttacker(Attacker):
                     continue
                 else:  # LOGIN_SUCCESS, USERNAME_NOT_FOUND, any defenses
                     summary[target][result] += 1
-                    break
+                    targets.remove(target)
         return summary
