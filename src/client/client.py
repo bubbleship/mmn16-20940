@@ -9,6 +9,7 @@ class Client:
         self.async_client: httpx.AsyncClient | None = None
 
     async def get_captcha_token(self) -> str:
+        """For testing purposes only. Should not be used in the experiment."""
         admin_url = f"{self.config.admin_url}/get_captcha_token"
         params = {"request_group_seed": self.config.group_seed}
         response = await self.async_client.get(admin_url, params=params)
