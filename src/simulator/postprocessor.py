@@ -5,8 +5,8 @@ This module provides analysis and visualization capabilities for experiment resu
 It calculates performance metrics, estimates attack success probabilities, and
 generates visualizations for the research report.
 """
-import statistics
 import json
+import statistics
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -361,9 +361,6 @@ class ResultsPostprocessor:
                     dpi=300, bbox_inches='tight')
         plt.close()
 
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import statistics
     from typing import Dict, Any
 
     def _plot_latency_p90_comparison(self, results: Dict[str, Any]) -> None:
@@ -448,7 +445,7 @@ class ResultsPostprocessor:
 
         # Add value labels
         for i, (bar, value) in enumerate(zip(bars1, bf_success)):
-            ax1.text(value + 1, i, f'{value:.1f}%', va='center', fontsize=9)
+            ax1.text(value + 1, i, f'{value:.3f}%', va='center', fontsize=9)
 
         # Password Spray Success Rate
         bars2 = ax2.barh(range(len(cases)), ps_success, color=colors, alpha=0.7)
@@ -461,7 +458,7 @@ class ResultsPostprocessor:
 
         # Add value labels
         for i, (bar, value) in enumerate(zip(bars2, ps_success)):
-            ax2.text(value + 1, i, f'{value:.1f}%', va='center', fontsize=9)
+            ax2.text(value + 1, i, f'{value:.3f}%', va='center', fontsize=9)
 
         plt.tight_layout()
         plt.savefig(self.output_dir / 'success_rate_comparison.png',
