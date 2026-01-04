@@ -87,14 +87,17 @@ class ExperimentRunner:
         """Helper to replace raw latency lists with statistical summaries."""
         for user_data in summary_dict.values():
             if isinstance(user_data, dict) and 'latencies' in user_data:
-                latencies = user_data['latencies']
+                latencies = sorted(user_data['latencies'])
                 if latencies:
-                    user_data['latency_median'] = statistics.median(latencies)
-                    user_data['latency_std_dev'] = statistics.stdev(latencies) if len(latencies) > 1 else 0
-                    user_data['latency_max'] = max(latencies)
-                    user_data['latency_min'] = min(latencies)
+                    n = len(latencies)
+                    p90_index = max(0, int(n * 0.9) - 1)
 
-                # delete the long list from summery to reduce JSON size
+                    user_data['latency_median'] = statistics.median(latencies)
+                    user_data['latency_p90'] = latencies[p90_index]  # שומרים את האחוזון ה-90
+                    user_data['latency_std_dev'] = statistics.stdev(latencies) if n > 1 else 0
+                    user_data['latency_max'] = latencies[-1]
+                    user_data['latency_min'] = latencies[0]
+
                 del user_data['latencies']
 
     async def _run_attacks(self, target: str, brute_force_limit: int = 10_000,

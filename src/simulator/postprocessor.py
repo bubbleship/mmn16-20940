@@ -177,46 +177,7 @@ class ResultsPostprocessor:
             avg_latency=avg_lat
         )
 
-    def _plot_latency_distribution(self, results: Dict[str, Any]) -> None:
-        """Generates a Bar Plot showing the median latency for each case."""
-        plt.figure(figsize=(12, 7))
 
-        cases = []
-        medians = []
-        colors = []
-
-        for case_name, case_result in results.items():
-            case_medians = []
-            if 'brute_force' in case_result:
-                for target_data in case_result['brute_force'].values():
-                    if 'latency_median' in target_data:
-                        case_medians.append(target_data['latency_median'])
-
-            if case_medians:
-                cases.append(case_name.replace('_', ' ').title())
-                avg_median = statistics.mean(case_medians)
-                medians.append(avg_median)
-
-                category = self._categorize_case(case_name)
-                colors.append(self.defense_colors.get(category, '#888888'))
-
-        if not medians:
-            return
-
-        bars = plt.barh(cases, medians, color=colors)
-        plt.xlabel('Median Latency (Seconds)')
-        plt.title('Comparison of Median Latency Across Test Cases', fontsize=14, fontweight='bold')
-
-        # Add value labels for better readability
-        for bar in bars:
-            width = bar.get_width()
-            plt.text(width, bar.get_y() + bar.get_height() / 2, f' {width:.4f}s',
-                     va='center', ha='left', fontsize=10)
-
-        plt.grid(axis='x', alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(self.output_dir / 'latency_comparison.png', dpi=300)
-        plt.close()
 
     @staticmethod
     def _categorize_case(case_name: str) -> str:
@@ -347,7 +308,7 @@ class ResultsPostprocessor:
             return
 
         # Generate individual plots
-        self._plot_latency_distribution(valid_results)
+        self._plot_latency_p90_comparison(valid_results)
         self._plot_requests_per_second_comparison(valid_results)
         self._plot_success_rate_comparison(valid_results)
         self._plot_estimated_attack_time(valid_results)
@@ -398,6 +359,72 @@ class ResultsPostprocessor:
         plt.tight_layout()
         plt.savefig(self.output_dir / 'requests_per_second_comparison.png',
                     dpi=300, bbox_inches='tight')
+        plt.close()
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import statistics
+    from typing import Dict, Any
+
+    def _plot_latency_p90_comparison(self, results: Dict[str, Any]) -> None:
+        """Generates a Bar Plot comparing Median and 90th Percentile latency."""
+        plt.figure(figsize=(14, 8))
+
+        cases = []
+        medians = []
+        p90s = []
+        colors = []
+
+        for case_name, case_result in results.items():
+            case_p90s = []
+            case_medians = []
+
+            # Determine the primary attack data to visualize
+            attack_type = 'brute_force' if 'brute_force' in case_result else 'password_spray'
+
+            if attack_type in case_result:
+                for target_data in case_result[attack_type].values():
+                    if 'latency_p90' in target_data:
+                        case_p90s.append(target_data['latency_p90'])
+                        case_medians.append(target_data['latency_median'])
+
+            if case_p90s:
+                cases.append(case_name.replace('_', ' ').title())
+                p90s.append(statistics.mean(case_p90s))
+                medians.append(statistics.mean(case_medians))
+
+                # Use your existing color categorization
+                category = self._categorize_case(case_name)
+                colors.append(self.defense_colors.get(category, '#888888'))
+
+        if not cases:
+            return
+
+        y = np.arange(len(cases))
+        height = 0.35
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Plotting both metrics for distribution comparison
+        rects1 = ax.barh(y - height / 2, medians, height, label='Median (P50)', color='#3498db', alpha=0.8)
+        rects2 = ax.barh(y + height / 2, p90s, height, label='90th Percentile (P90)', color='#e74c3c', alpha=0.8)
+
+        ax.set_xlabel('Latency (Seconds)')
+        ax.set_title('Latency Distribution Analysis: Median vs. P90', fontsize=14, fontweight='bold')
+        ax.set_yticks(y)
+        ax.set_yticklabels(cases)
+        ax.legend()
+
+        # Add data labels
+        for i, p in enumerate(p90s):
+            ax.text(p, i + height / 2, f' {p:.4f}s', va='center', fontsize=9, color='darkred', fontweight='bold')
+
+        for i, m in enumerate(medians):
+            ax.text(m, i - height / 2, f' {m:.4f}s', va='center', fontsize=9, color='darkblue')
+
+        plt.grid(axis='x', linestyle='--', alpha=0.6)
+        plt.tight_layout()
+        plt.savefig(self.output_dir / 'latency_distribution_p90.png', dpi=300)
         plt.close()
 
     def _plot_success_rate_comparison(self, results: Dict[str, Any]) -> None:
