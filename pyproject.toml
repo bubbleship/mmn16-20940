@@ -5,5 +5,24 @@ description = "The codebase for assignment 16"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.124.2",
+    "argon2-cffi>=25.1.0",
+    "bcrypt>=5.0.0",
+    "fastapi>=0.124.4",
+    "httpx>=0.28.1",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.0",
+    "pyotp>=2.9.0",
+    "seaborn>=0.13.2",
+    "uvicorn[standard]>=0.38.0",
 ]
+
+[project.scripts]
+run-experiment = "src.main:main"
+gen-users = "src.gen_users:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

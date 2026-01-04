@@ -1,0 +1,122 @@
+import asyncio
+from collections import defaultdict
+from enum import StrEnum
+from typing import Protocol, Iterable
+
+from src.client.client import Client
+
+
+class Result(StrEnum):
+    SUCCESS = "SUCCESS"
+    INVALID_CREDENTIALS = "INVALID CREDENTIALS"
+    USERNAME_NOT_FOUND = "USERNAME NOT FOUND"
+    MFA = "MFA"
+    RATE_LIMIT = "RATE LIMIT"
+    ACCOUNT_LOCKOUT = "ACCOUNT LOCKOUT"
+    CAPTCHA = "CAPTCHA"
+    INTERNAL_SERVER_ERROR = "INTERNAL SERVER ERROR"
+
+
+class Attacker(Protocol):
+    """Represents an attacker that can launch attacks against a target."""
+
+    def __init__(self, client: Client):
+        self.client: Client = client
+
+    async def attempt_login(self, username: str, password: str) -> Result:
+        """Attempts to log in with the given username and password and interprets the result."""
+        response = await self.client.send_login_request(username, password)
+        # noinspection PyRedundantParentheses
+        match (response.status_code):
+            case 200:
+                return Result.SUCCESS
+            case 401:
+                return Result.INVALID_CREDENTIALS
+            case 404:
+                return Result.USERNAME_NOT_FOUND
+            case 403:
+                return Result.MFA
+            case 429:
+                return Result.RATE_LIMIT
+            case 423:
+                return Result.ACCOUNT_LOCKOUT
+            case 418:
+                return Result.CAPTCHA
+            case _:
+                return Result.INTERNAL_SERVER_ERROR
+
+
+class BruteForceAttacker(Attacker):
+    """Represents a brute force attacker that tries the given dictionary of passwords against a small set of targets."""
+
+    async def launch_attack(self, target: str, patterns: Iterable[str], delay: float = 0.0) -> dict:
+        """
+        Simulates a brute force attack on the given targets.
+
+        Args:
+            target: username to target in the attack
+            patterns: an iterable of passwords to try against the targets
+            delay: the delay between each password attempt, in seconds. Defaults to None
+
+        Returns:
+            A summary of the attack.
+        """
+        summary = {target: defaultdict(int)}
+        # Added for performance analysis
+        summary[target]['latencies'] = []
+
+        for pattern in patterns:
+            start_time = asyncio.get_event_loop().time()
+            result = await self.attempt_login(target, pattern)
+            latency = asyncio.get_event_loop().time() - start_time
+
+            summary[target]['latencies'].append(latency)
+
+            await asyncio.sleep(delay)
+            if result is Result.INVALID_CREDENTIALS:
+                summary[target][result] += 1
+                continue
+            else:  # LOGIN_SUCCESS, USERNAME_NOT_FOUND, any defenses
+                summary[target][result] += 1
+                break
+        return summary
+
+
+class PasswordSprayAttacker(Attacker):
+    """Represents a password spray attacker that tries the given dictionary of passwords against a large set of targets."""
+
+    async def launch_attack(self, targets: Iterable[str], patterns: Iterable[str], delay: float = 0.0) -> dict:
+        """
+        Simulates a dictionary-based attack on the given targets.
+
+        Args:
+            targets: usernames to target in the attack
+            patterns: an iterable of passwords to try against the targets
+            delay: the delay between each password attempt, in seconds. Defaults to None.
+
+        Returns:
+            A summary of the attack.
+        """
+        summary = {target: defaultdict(int) for target in targets}
+        targets = set(targets)
+        # Added for performance analysis
+        for target in targets:
+            summary[target]['latencies'] = []
+
+        for pattern in patterns:
+            targets_iter = targets.copy()
+            for target in targets_iter:
+                start_time = asyncio.get_event_loop().time()
+                result = await self.attempt_login(target, pattern)
+                latency = asyncio.get_event_loop().time() - start_time
+
+                summary[target]['latencies'].append(latency)
+
+                await asyncio.sleep(delay)
+                if result is Result.INVALID_CREDENTIALS:
+                    summary[target][result] += 1
+                    continue
+                else:  # LOGIN_SUCCESS, USERNAME_NOT_FOUND, any defenses
+                    summary[target][result] += 1
+                    targets.remove(target)
+        return summary

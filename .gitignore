@@ -11,3 +11,6 @@ wheels/
 
 # JetBrains IDEA
 .idea
+
+# Experiment results
+results
